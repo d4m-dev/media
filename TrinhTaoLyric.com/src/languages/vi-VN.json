@@ -1,0 +1,91 @@
+{
+    "languageName": "Tiếng Việt",
+    "app": {
+        "name": "LRC Maker",
+        "fullname": "Akari's LRC Maker"
+    },
+    "header": {
+        "home": "trang chủ",
+        "editor": "trình soạn thảo",
+        "synchronizer": "đồng bộ",
+        "gist": "Github Gist",
+        "preferences": "tùy chọn"
+    },
+    "audio": {
+        "loadAudio": "tải nhạc",
+        "play": "phát",
+        "pause": "tạm dừng",
+        "replay5s": "lùi 5s",
+        "forward5s": "tới 5s",
+        "resetRate": "đặt lại tốc độ",
+        "error": [
+            "lỗi âm thanh",
+            "âm thanh bị hủy bởi người dùng",
+            "lỗi mạng âm thanh",
+            "lỗi giải mã âm thanh",
+            "âm thanh không được hỗ trợ"
+        ]
+    },
+    "loadAudio": {
+        "file": "Tệp",
+        "url": "URL",
+        "loadFile": "Nhấp vào đây hoặc thả tệp nhạc vào trang này"
+    },
+    "home": {
+        "tips": "Mẹo",
+        "tipForLyricText": "Chuyển đến trang soạn thảo và dán lời bài hát.",
+        "tipForUploadAudio": "Nhấp vào nút góc dưới bên trái để tải tệp nhạc.",
+        "tipForSynchronizer": "Chuyển đến trang đồng bộ và tạo lrc của bạn :)",
+        "tipTopLeft": "Nhấp vào đây để quay lại trang này",
+        "tipTopRight": "Nhấp vào đây để chuyển đến trang khác",
+        "tipBottomLeft": "tải nhạc ở đây và điều khiển nhạc",
+        "tipBottomRight": "thay đổi tốc độ phát ở đây"
+    },
+    "editor": {
+        "metaInfo": "thông tin meta",
+        "album": "album",
+        "title": "tiêu đề",
+        "artist": "ca sĩ",
+        "uploadText": "tải lên văn bản",
+        "copyText": "chọn tất cả và sao chép",
+        "downloadText": "tải xuống",
+        "saveToGist": "lưu vào Github Gist",
+        "saveFileName": "Tên tệp",
+        "utils": "công cụ lrc"
+    },
+    "gist": {
+        "newTokenTip": "LRC Maker sử dụng Github Token để lấy và lưu trữ dữ liệu vào Github Gist",
+        "newTokenButton": "Tạo Github Token mới",
+        "newGistTip": "Tạo Gist repository mới hoặc gán id Gist hiện có",
+        "newGistRepoButton": "Tạo Gist Repository mới",
+        "gistIdPlaceholder": "Hoặc gán id Gist hiện có",
+        "info": "thông tin",
+        "clearTokenAndGist": "Xóa token và Gist id"
+    },
+    "preferences": {
+        "version": "Phiên bản",
+        "commitHash": "Commit hash",
+        "updateTime": "Thời gian cập nhật",
+        "repo": "Repository",
+        "help": "Trợ giúp & mẹo",
+        "language": "Ngôn ngữ",
+        "builtInAudio": "Sử dụng trình phát nhạc của trình duyệt",
+        "spaceButton": "Phím space trên màn hình",
+        "showWaveform": "Hiển thị sóng âm thanh trên thanh tìm kiếm",
+        "themeColor": "Màu chủ đề",
+        "lrcFormat": "Thay đổi định dạng đầu ra",
+        "fixed": "Timestamp cố định",
+        "leftSpace": "Khoảng cách trái",
+        "rightSpace": "Khoảng cách phải",
+        "clearCache": "Xóa bộ nhớ cache",
+        "themeMode": {
+            "label": "Chế độ chủ đề",
+            "auto": "tự động",
+            "light": "sáng",
+            "dark": "tối"
+        }
+    },
+    "notify": {
+        "audioLoaded": "Đã tải nhạc."
+    }
+}

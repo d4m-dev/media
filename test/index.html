@@ -1,0 +1,222 @@
+<!doctype html>
+
+<html lang="vi" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@d4m-dev • Personal Page</title>
+    <meta name="description" content="Trang cá nhân phong cách Instagram, tự động lấy dữ liệu từ GitHub cho @d4m-dev" />
+    <meta property="og:title" content="@d4m-dev • Personal Page" />
+    <meta property="og:description" content="Trang cá nhân phong cách Instagram, tự động lấy dữ liệu từ GitHub cho @d4m-dev" />
+    <meta property="og:type" content="website" /><!-- Tailwind CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: { inter: ["Inter", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "Noto Sans", "sans-serif"] },
+        colors: {
+          igbg: {
+            light: "#fafafa",
+            dark: "#000000"
+          }
+        }
+      }
+    },
+    darkMode: 'class'
+  }
+</script>
+<!-- Inter font -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Smooth image skeleton shimmer */
+  .skeleton { position: relative; overflow: hidden; }
+  .skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent); animation: shimmer 1.25s infinite; }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+</style>
+
+  </head>
+  <body class="h-full bg-igbg-light dark:bg-black text-neutral-900 dark:text-neutral-100 font-inter">
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <!-- Top bar -->
+      <header class="flex items-center justify-between mb-6">
+        <a href="https://github.com/d4m-dev" target="_blank" rel="noopener" class="text-xl font-bold tracking-tight">@d4m-dev</a>
+        <div class="flex items-center gap-2">
+          <button id="themeToggle" class="rounded-full border border-neutral-300 dark:border-neutral-700 px-3 py-1 text-sm">🌙/☀️</button>
+          <a id="followBtn" href="https://github.com/d4m-dev" target="_blank" rel="noopener" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-3 py-1 rounded-lg">Follow</a>
+        </div>
+      </header><!-- Profile section (Instagram-like) -->
+  <section class="grid grid-cols-1 sm:grid-cols-[auto,1fr] gap-8 items-center">
+    <div class="flex justify-center sm:justify-start">
+      <div class="w-32 h-32 sm:w-40 sm:h-40 rounded-full p-[3px] bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600">
+        <img id="avatar" alt="avatar" class="w-full h-full rounded-full object-cover bg-neutral-200 skeleton" src="" />
+      </div>
+    </div>
+    <div>
+      <div class="flex flex-wrap items-center gap-3 mb-3">
+        <h1 id="name" class="text-2xl font-semibold">@d4m-dev</h1>
+        <a id="website" class="text-sm text-blue-500 hover:underline break-all" href="#" target="_blank" rel="noopener"></a>
+        <a id="linkfly" class="text-sm text-blue-500 hover:underline break-all" href="#" target="_blank" rel="noopener"></a>
+      </div>
+      <ul class="flex gap-6 text-sm mb-3">
+        <li><span id="repoCount" class="font-semibold">0</span> repositories</li>
+        <li><span id="followers" class="font-semibold">0</span> followers</li>
+        <li><span id="following" class="font-semibold">0</span> following</li>
+      </ul>
+      <div class="space-y-1 text-sm">
+        <p id="bio" class="whitespace-pre-line"></p>
+        <p id="location" class="opacity-80"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Highlights (like story highlights) -->
+  <section class="mt-8">
+    <ul id="highlights" class="flex gap-5 overflow-auto py-1"></ul>
+  </section>
+
+  <!-- Tabs -->
+  <nav class="mt-6 border-t border-b border-neutral-200 dark:border-neutral-800 flex divide-x divide-neutral-200 dark:divide-neutral-800 text-sm">
+    <button data-tab="repos" class="tab-btn px-4 py-3 font-semibold">📦 Repositories</button>
+    <button data-tab="stars" class="tab-btn px-4 py-3">⭐ Starred</button>
+  </nav>
+
+  <!-- Posts grid (Instagram-like grid for repos) -->
+  <section id="repos" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2 sm:gap-4 mt-4"></section>
+  <section id="stars" class="hidden grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2 sm:gap-4 mt-4"></section>
+
+  <!-- Footer -->
+  <footer class="mt-12 text-xs text-neutral-500 flex flex-wrap gap-x-4 gap-y-1">
+    <span>Built with ❤️ using the GitHub API</span>
+    <a class="hover:underline" href="https://github.com/d4m-dev" target="_blank" rel="noopener">@d4m-dev</a>
+    <span>•</span>
+    <button id="forceRefresh" class="hover:underline">Refresh</button>
+  </footer>
+</main>
+
+<script>
+  const USER = 'd4m-dev';
+  const $$ = (sel, ctx=document) => ctx.querySelector(sel);
+  const $$$ = (sel, ctx=document) => Array.from(ctx.querySelectorAll(sel));
+
+  // Theme toggle (persist to localStorage)
+  const themeToggle = $$('#themeToggle');
+  const storedTheme = localStorage.getItem('theme');
+  if (storedTheme === 'dark' || (!storedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+  themeToggle.addEventListener('click', () => {
+    document.documentElement.classList.toggle('dark');
+    localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  });
+
+  function numberFmt(n){
+    return n >= 1000 ? (n/1000).toFixed(n % 1000 >= 100 ? 1 : 0) + 'k' : String(n);
+  }
+
+  function repoCard(r){
+    const stars = r.stargazers_count || 0;
+    const lang = r.language || '';
+    const desc = r.description ? r.description.replace(/</g,'&lt;') : '';
+    return `
+    <a href="${r.html_url}" target="_blank" rel="noopener" title="${r.name}" class="group relative block aspect-square bg-neutral-100 dark:bg-neutral-900 rounded-md overflow-hidden">
+      <div class="absolute inset-0 flex items-center justify-center text-5xl opacity-10 group-hover:opacity-20 transition"></div>
+      <div class="absolute inset-0 p-3 flex flex-col justify-end bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition">
+        <h3 class="text-white font-semibold text-sm truncate">${r.name}</h3>
+        <p class="text-neutral-200 text-xs line-clamp-2">${desc}</p>
+        <div class="flex items-center gap-3 text-[11px] text-neutral-200 mt-1">
+          <span>⭐ ${numberFmt(stars)}</span>
+          ${lang ? `<span>• ${lang}</span>` : ''}
+          <span>• ⏱️ ${new Date(r.pushed_at || r.updated_at).toLocaleDateString()}</span>
+        </div>
+      </div>
+    </a>`;
+  }
+
+  function highlightItem({label, url, emoji}){
+    return `
+      <li class="flex-shrink-0">
+        <a href="${url}" target="_blank" rel="noopener" class="block text-center">
+          <span class="block w-16 h-16 rounded-full p-[2px] bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 mx-auto">
+            <span class="w-full h-full rounded-full bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center text-xl">${emoji}</span>
+          </span>
+          <span class="mt-2 block text-[11px]">${label}</span>
+        </a>
+      </li>`
+  }
+
+  async function load(){
+    try {
+      const [userRes, repoRes, starRes] = await Promise.all([
+        fetch(`https://api.github.com/users/${USER}`),
+        fetch(`https://api.github.com/users/${USER}/repos?per_page=100&sort=updated`),
+        fetch(`https://api.github.com/users/${USER}/starred?per_page=100`)
+      ]);
+
+      if (!userRes.ok) throw new Error('Không thể tải user');
+      const user = await userRes.json();
+
+      const repos = (await repoRes.json()).filter(r => !r.fork);
+      const stars = await starRes.json();
+
+      // Profile
+      $$('#avatar').src = user.avatar_url;
+      $$('#name').textContent = user.name ? `${user.name}  (@${user.login})` : `@${user.login}`;
+      $$('#bio').textContent = user.bio || '';
+      $$('#location').textContent = user.location ? `📍 ${user.location}` : '';
+      $$('#followers').textContent = numberFmt(user.followers || 0);
+      $$('#following').textContent = numberFmt(user.following || 0);
+      $$('#repoCount').textContent = numberFmt(user.public_repos || repos.length);
+
+      const site = user.blog && user.blog.trim() ? user.blog : '';
+      if (site) { const a = $$('#website'); a.href = site.startsWith('http')? site : `https://${site}`; a.textContent = a.href.replace(/^https?:\/\//,''); } else { $$('#website').remove(); }
+
+      // Add linkfly if used in bio or extra (manually include known)
+      const lf = 'https://linkfly.to/lyanan1609';
+      const lfEl = $$('#linkfly'); lfEl.href = lf; lfEl.textContent = 'linkfly.to/lyanan1609';
+
+      // Highlights
+      const highlights = [
+        { label: 'GitHub', url: user.html_url, emoji: '🐙' },
+        ...(site ? [{ label: 'Website', url: $$('#website').href, emoji: '🌐' }] : []),
+        { label: 'Stars', url: `${user.html_url}?tab=stars`, emoji: '⭐' },
+        { label: 'Gists', url: `https://gist.github.com/${USER}`, emoji: '📝' },
+      ];
+      $$('#highlights').innerHTML = highlights.map(highlightItem).join('');
+
+      // Repos (sort by stars desc, then updated desc)
+      repos.sort((a,b)=> (b.stargazers_count - a.stargazers_count) || new Date(b.pushed_at||b.updated_at) - new Date(a.pushed_at||a.updated_at));
+      const top = repos.slice(0, 12);
+      $$('#repos').innerHTML = top.map(repoCard).join('');
+
+      // Starred tab (show latest starred)
+      stars.sort((a,b)=> new Date(b.starred_at||b.pushed_at||b.updated_at) - new Date(a.starred_at||a.pushed_at||a.updated_at));
+      $$('#stars').innerHTML = stars.slice(0, 12).map(repoCard).join('');
+    } catch (e) {
+      console.error(e);
+      const msg = document.createElement('div');
+      msg.className = 'mt-8 p-4 rounded-md bg-red-50 text-red-700 border border-red-200';
+      msg.textContent = 'Không thể tải dữ liệu từ GitHub API (có thể do giới hạn rate-limit). Hãy thử tải lại trang sau vài phút.';
+      document.body.appendChild(msg);
+    }
+  }
+
+  // Tabs handler
+  $$$('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
+    $$$('.tab-btn').forEach(b => b.classList.remove('font-semibold'));
+    btn.classList.add('font-semibold');
+    const t = btn.dataset.tab;
+    $$('#repos').classList.toggle('hidden', t !== 'repos');
+    $$('#stars').classList.toggle('hidden', t !== 'stars');
+  }));
+
+  // Manual refresh
+  $$('#forceRefresh').addEventListener('click', () => { load(); });
+
+  load();
+</script>
+
+  </body>
+</html>

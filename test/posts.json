@@ -1,0 +1,23 @@
+[
+    {
+        "username": "google",
+        "profilePic": "https://i.pravatar.cc/150?u=google",
+        "postImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=500",
+        "caption": "Một góc nhìn khác về công nghệ.",
+        "likes": 1234
+    },
+    {
+        "username": "nasa",
+        "profilePic": "https://i.pravatar.cc/150?u=nasa",
+        "postImage": "https://images.unsplash.com/photo-1454789548928-9efd52dc4031?w=500",
+        "caption": "Vẻ đẹp của vũ trụ bao la.",
+        "likes": 5678
+    },
+    {
+        "username": "natgeo",
+        "profilePic": "https://i.pravatar.cc/150?u=natgeo",
+        "postImage": "https://images.unsplash.com/photo-1472214103451-9374bd1c798e?w=500",
+        "caption": "Thiên nhiên luôn ẩn chứa những điều kỳ diệu.",
+        "likes": 9101
+    }
+]

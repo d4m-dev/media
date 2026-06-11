@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ubuntu Backend Core | Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 min-h-screen text-white font-sans antialiased selection:bg-blue-500 selection:text-white">
+
+    <div id="login-overlay" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md transition-opacity duration-300">
+        <div class="glass-card p-8 rounded-2xl w-full max-w-md mx-4 shadow-2xl">
+            <h2 class="text-2xl font-bold text-center mb-6"><i class="fa-solid fa-shield-halved text-blue-500 mr-2"></i>Xác Thực Quản Trị</h2>
+            <form id="login-form" class="space-y-5">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Tài khoản</label>
+                    <input type="text" id="username" class="w-full bg-black/40 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" required autocomplete="off">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Mật khẩu</label>
+                    <input type="password" id="password" class="w-full bg-black/40 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" required>
+                </div>
+                <div id="login-error" class="text-red-400 text-sm hidden text-center bg-red-900/30 py-2 rounded-lg"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Sai thông tin!</div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg hover:shadow-blue-500/30 flex justify-center items-center">
+                    <span id="login-text">Đăng Nhập</span>
+                    <i id="login-spinner" class="fa-solid fa-circle-notch fa-spin ml-2 hidden"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <nav class="glass-header sticky top-0 z-50 px-6 py-4 mb-8">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold tracking-wider">
+                <i class="fa-brands fa-ubuntu text-orange-500 mr-2"></i>Backend Core
+            </h1>
+            <div class="flex items-center space-x-4">
+                <span class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                </span>
+                <button onclick="logout()" class="text-sm font-medium text-gray-400 hover:text-white transition"><i class="fa-solid fa-right-from-bracket mr-1"></i>Thoát</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-2 space-y-6">
+            <h2 class="text-xl font-semibold"><i class="fa-solid fa-server mr-2"></i>Trạng Thái Phần Cứng</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-card p-6 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-microchip text-4xl text-blue-400 mb-3"></i>
+                    <h3 class="text-gray-300 text-sm">CPU Load</h3>
+                    <p class="text-3xl font-bold mt-1" id="cpu-val">--%</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-memory text-4xl text-purple-400 mb-3"></i>
+                    <h3 class="text-gray-300 text-sm">RAM Usage</h3>
+                    <p class="text-3xl font-bold mt-1" id="ram-val">--%</p>
+                    <p class="text-xs text-gray-400 mt-2" id="ram-detail">-- / -- GB</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fa-solid fa-hard-drive text-4xl text-green-400 mb-3"></i>
+                    <h3 class="text-gray-300 text-sm">Storage (512GB)</h3>
+                    <p class="text-3xl font-bold mt-1" id="disk-val">--%</p>
+                    <p class="text-xs text-gray-400 mt-2" id="disk-detail">Free: -- GB</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <h2 class="text-xl font-semibold"><i class="fa-solid fa-network-wired mr-2"></i>Quản Lý API</h2>
+            <div class="glass-card p-6 rounded-2xl space-y-4" id="services-container">
+                </div>
+        </div>
+
+        <div class="lg:col-span-3 mt-2">
+            <h2 class="text-xl font-semibold mb-4"><i class="fa-solid fa-chart-line mr-2"></i>Lưu Lượng API (10 Phút Qua)</h2>
+            <div class="glass-card p-6 rounded-2xl relative h-72">
+                <canvas id="trafficChart"></canvas>
+            </div>
+        </div>
+
+        <div class="lg:col-span-3 mt-4 mb-10">
+            <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
+                <div class="bg-gray-900/80 px-4 py-3 flex items-center border-b border-gray-700">
+                    <div class="flex space-x-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                    </div>
+                    <span class="ml-4 text-xs font-mono text-gray-400">root@ubuntu-backend:~ (Port 16868)</span>
+                </div>
+                <div class="p-5 bg-black/90 h-72 overflow-y-auto font-mono text-sm leading-relaxed" id="terminal-output">
+                    <div class="text-green-400 mb-2">user@backend:~$ Đang chờ luồng WebSocket...</div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="js/app.js"></script>
+    <script src="js/chart.js"></script> <script src="js/terminal.js"></script>
+</body>
+</html>

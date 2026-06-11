@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html><body>
+<script>
+async function test() {
+    try {
+        await fetch('http://127.0.0.1:9999/', { mode: 'no-cors' });
+        console.log('Resolved!');
+    } catch(e) {
+        console.log('Rejected!', e);
+    }
+}
+test();
+</script>
+</body></html>

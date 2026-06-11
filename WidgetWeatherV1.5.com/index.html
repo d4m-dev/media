@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Weather Widget Fixed</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f5f7fa; font-family: 'Segoe UI', sans-serif; }
+  
+  .weather-widget { display: flex; background: #fff; border-radius: 20px; padding: 25px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); max-width: 800px; width: 100%; gap: 30px; position: relative; overflow: hidden; }
+  .weather-widget::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #667eea, #764ba2); }
+  
+  .left-section { flex: 1.2; } /* Tăng nhẹ độ rộng phần trái */
+  .right-section { flex: 1; border-left: 2px solid #f0f0f0; padding-left: 30px; display: flex; flex-direction: column; }
+  
+  .location-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .city-info h2 { font-size: 24px; color: #333; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+  .city-info p { color: #666; font-size: 14px; }
+  
+  .action-btns { display: flex; gap: 10px; }
+  .btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #667eea; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
+  .btn:hover { background: #5a67d8; transform: scale(1.1); }
+  .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+  
+  .weather-main { text-align: center; margin: 20px 0; }
+  .temp { font-size: 56px; font-weight: bold; color: #333; margin-bottom: 10px; }
+  .desc { font-size: 18px; color: #666; text-transform: capitalize; }
+  .weather-icon { font-size: 60px; color: #667eea; margin-bottom: 15px; animation: float 3s ease-in-out infinite; }
+  
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  
+  .details-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 25px; }
+  .detail-item { background: #f8f9fa; padding: 15px; border-radius: 15px; display: flex; align-items: center; gap: 12px; }
+  .detail-icon { color: #667eea; font-size: 22px; width: 25px; text-align: center; }
+  .detail-text h4 { font-size: 12px; color: #666; margin-bottom: 4px; }
+  .detail-text p { font-size: 16px; font-weight: 600; color: #333; }
+  
+  .forecast-section { flex: 1; display: flex; flex-direction: column; }
+  .forecast-section h3 { font-size: 18px; color: #333; margin-bottom: 20px; }
+  .forecast-days { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  
+  /* Chuyển forecast sang dạng list dọc để đẹp hơn bên phải */
+  .forecast-day { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f8f9fa; border-radius: 12px; }
+  .forecast-day p { color: #666; font-size: 14px; margin: 0; min-width: 60px; }
+  .forecast-icon { font-size: 20px; color: #667eea; margin: 0 15px; }
+  .forecast-temp { font-size: 16px !important; font-weight: 600; color: #333; }
+  
+  .loading, .error { text-align: center; padding: 40px; width: 100%; }
+  .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  
+  .notification {
+    background-color: #fff3cd; color: #856404; padding: 10px;
+    border-radius: 8px; font-size: 12px; margin-top: 10px; text-align: center;
+    border: 1px solid #ffeeba; display: none;
+  }
+  
+  @media (max-width: 768px) {
+    .weather-widget { flex-direction: column; padding: 20px; margin: 10px; height: auto; overflow-y: auto; }
+    .right-section { border-left: none; border-top: 2px solid #f0f0f0; padding-left: 0; padding-top: 30px; }
+    .city-info h2 { max-width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="weather-widget">
+  <div class="left-section">
+    <div class="location-header">
+      <div class="city-info">
+        <h2 id="city-name">--</h2>
+        <p id="current-date">--</p>
+      </div>
+      <div class="action-btns">
+        <button class="btn" id="refresh-btn" title="Cập nhật"><i class="fas fa-sync-alt"></i></button>
+        <button class="btn" id="location-btn" title="Vị trí của tôi"><i class="fas fa-location-arrow"></i></button>
+      </div>
+    </div>
+    
+    <div class="weather-main">
+      <div class="weather-icon" id="weather-icon"><i class="fas fa-cloud"></i></div>
+      <div class="temp" id="temperature">--°C</div>
+      <div class="desc" id="description">--</div>
+    </div>
+    
+    <div class="details-grid">
+      <div class="detail-item">
+        <div class="detail-icon"><i class="fas fa-temperature-high"></i></div>
+        <div class="detail-text">
+          <h4>Cảm giác như</h4>
+          <p id="feels-like">--°C</p>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-icon"><i class="fas fa-tint"></i></div>
+        <div class="detail-text">
+          <h4>Độ ẩm</h4>
+          <p id="humidity">--%</p>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-icon"><i class="fas fa-wind"></i></div>
+        <div class="detail-text">
+          <h4>Gió</h4>
+          <p id="wind-speed">-- km/h</p>
+        </div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-icon"><i class="fas fa-compress-alt"></i></div>
+        <div class="detail-text">
+          <h4>Áp suất</h4>
+          <p id="pressure">-- hPa</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="right-section">
+    <div class="forecast-section" id="forecast-content">
+      <h3><i class="fas fa-calendar-alt"></i> Dự báo 5 ngày</h3>
+      <div class="forecast-days" id="forecast-days">
+        <!-- Forecast items will go here -->
+      </div>
+      <div class="notification" id="sample-data-notify">
+        <i class="fas fa-info-circle"></i> Đang hiển thị dữ liệu mẫu (API Key hết hạn hoặc lỗi kết nối).
+      </div>
+    </div>
+    
+    <div class="loading" id="loading" style="display: none;">
+      <div class="spinner"></div>
+      <p>Đang tải dữ liệu...</p>
+    </div>
+    
+    <div class="error" id="error" style="display:none">
+      <i class="fas fa-exclamation-triangle" style="font-size:40px;color:#e74c3c;margin-bottom:15px"></i>
+      <h3>Không thể tải dữ liệu</h3>
+      <p id="error-message">Vui lòng thử lại</p>
+      <button class="btn" onclick="retryWeather()" style="margin: 15px auto 0;"><i class="fas fa-redo"></i></button>
+    </div>
+  </div>
+</div>
+
+<script>
+// API Key mẫu (Lưu ý: Key miễn phí thường có giới hạn hoặc có thể hết hạn)
+// Nếu key này chết, code sẽ tự động chuyển sang dữ liệu mẫu (useSampleData)
+const API_KEY = '617c4ee55ebc9a4b8dac0a1a1b8aa49f'; 
+const BASE_URL = 'https://api.openweathermap.org/data/2.5';
+
+const weatherIcons = {
+    '01d': 'fas fa-sun', '01n': 'fas fa-moon',
+    '02d': 'fas fa-cloud-sun', '02n': 'fas fa-cloud-moon',
+    '03d': 'fas fa-cloud', '03n': 'fas fa-cloud',
+    '04d': 'fas fa-cloud', '04n': 'fas fa-cloud',
+    '09d': 'fas fa-cloud-rain', '09n': 'fas fa-cloud-rain',
+    '10d': 'fas fa-cloud-sun-rain', '10n': 'fas fa-cloud-moon-rain',
+    '11d': 'fas fa-bolt', '11n': 'fas fa-bolt',
+    '13d': 'fas fa-snowflake', '13n': 'fas fa-snowflake',
+    '50d': 'fas fa-smog', '50n': 'fas fa-smog'
+};
+
+let currentCity = 'Ho Chi Minh City';
+let currentPos = null;
+let useGeo = false;
+
+function updateTime() {
+    const now = new Date();
+    document.getElementById('current-date').textContent = now.toLocaleDateString('vi-VN', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+function showLoading() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('forecast-content').style.display = 'none';
+    document.getElementById('error').style.display = 'none';
+    const btns = document.querySelectorAll('.btn');
+    btns.forEach(btn => btn.disabled = true);
+}
+
+function hideLoading() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('forecast-content').style.display = 'flex';
+    const btns = document.querySelectorAll('.btn');
+    btns.forEach(btn => btn.disabled = false);
+}
+
+function showSampleDataNotification(show) {
+    const el = document.getElementById('sample-data-notify');
+    el.style.display = show ? 'block' : 'none';
+}
+
+async function fetchWeather(city) {
+    let weatherData = null;
+    // Danh sách tên thành phố để thử (fallback nếu tên tiếng Việt lỗi)
+    const cityNames = [city, 'Saigon', 'Ho Chi Minh City'];
+
+    for (const cityName of cityNames) {
+        try {
+            const response = await fetch(
+                `${BASE_URL}/weather?q=${encodeURIComponent(cityName)}&appid=${API_KEY}&units=metric&lang=vi`
+            );
+            if (response.ok) {
+                weatherData = await response.json();
+                currentCity = cityName; // Update current city if found
+                break;
+            }
+        } catch (e) {
+            console.warn(`Failed to fetch for ${cityName}`);
+        }
+    }
+
+    if (!weatherData) throw new Error('Không tìm thấy thành phố');
+
+    const forecastResponse = await fetch(
+        `${BASE_URL}/forecast?q=${encodeURIComponent(currentCity)}&appid=${API_KEY}&units=metric&lang=vi`
+    );
+    
+    if (!forecastResponse.ok) throw new Error('Lỗi lấy dữ liệu dự báo');
+    
+    const forecastData = await forecastResponse.json();
+
+    return {
+        current: weatherData,
+        forecast: forecastData
+    };
+}
+
+async function fetchWeatherByCoords(lat, lon) {
+    const response = await fetch(
+        `${BASE_URL}/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=vi`
+    );
+    if (!response.ok) throw new Error('Lỗi API Weather');
+    const weatherData = await response.json();
+
+    const forecastResponse = await fetch(
+        `${BASE_URL}/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=vi`
+    );
+    if (!forecastResponse.ok) throw new Error('Lỗi API Forecast');
+    const forecastData = await forecastResponse.json();
+
+    return {
+        current: weatherData,
+        forecast: forecastData
+    };
+}
+
+function displayWeather(data) {
+    const { current, forecast } = data; // FIX: Lấy đối tượng forecast từ data
+
+    // Cập nhật thông tin hiện tại
+    document.getElementById('city-name').textContent = current.name + (current.sys.country ? ', ' + current.sys.country : '');
+    document.getElementById('temperature').textContent = Math.round(current.main.temp) + '°C';
+    document.getElementById('description').textContent = current.weather[0].description;
+    
+    // Icon
+    const iconCode = current.weather[0].icon;
+    const iconClass = weatherIcons[iconCode] || 'fas fa-cloud';
+    document.getElementById('weather-icon').innerHTML = `<i class="${iconClass}"></i>`;
+
+    // Chi tiết
+    document.getElementById('feels-like').textContent = Math.round(current.main.feels_like) + '°C';
+    document.getElementById('humidity').textContent = current.main.humidity + '%';
+    document.getElementById('wind-speed').textContent = Math.round(current.wind.speed * 3.6) + ' km/h'; // m/s to km/h
+    document.getElementById('pressure').textContent = current.main.pressure + ' hPa';
+
+    // Dự báo 5 ngày
+    const forecastContainer = document.getElementById('forecast-days');
+    forecastContainer.innerHTML = '';
+
+    const dailyForecasts = [];
+    const seenDays = new Set();
+    const today = new Date().getDate();
+
+    // FIX LOGIC: Sử dụng forecast.list thay vì forecastData.list
+    // Đổi tên biến lặp thành 'item' để tránh trùng với biến 'forecast' ở trên
+    if (forecast && forecast.list) {
+        for (const item of forecast.list) {
+            const date = new Date(item.dt * 1000);
+            const day = date.getDate();
+
+            // Lấy dự báo 12:00 trưa hoặc mục đầu tiên của ngày mới
+            if (day !== today && !seenDays.has(day) && dailyForecasts.length < 5) {
+                // Ưu tiên lấy lúc giữa trưa để chính xác hơn, hoặc nếu chưa có thì lấy cái đầu tiên tìm thấy
+                if (date.getHours() >= 11 || !seenDays.has(day)) {
+                    dailyForecasts.push(item);
+                    seenDays.add(day);
+                }
+            }
+        }
+    }
+
+    dailyForecasts.forEach(item => {
+        const date = new Date(item.dt * 1000);
+        const dayName = date.toLocaleDateString('vi-VN', { weekday: 'short' });
+        const iconCode = item.weather[0].icon;
+        const iconClass = weatherIcons[iconCode] || 'fas fa-cloud';
+        const temp = Math.round(item.main.temp);
+        const description = item.weather[0].description;
+
+        const dayElement = document.createElement('div');
+        dayElement.className = 'forecast-day';
+        dayElement.innerHTML = `
+            <div style="display:flex; align-items:center;">
+                <p style="font-weight:bold; width: 50px;">${dayName}</p>
+                <div class="forecast-icon" style="margin: 0 10px;"><i class="${iconClass}"></i></div>
+            </div>
+            <p style="font-size: 12px; color: #999; flex:1; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-right:5px;">${description}</p>
+            <p class="forecast-temp">${temp}°C</p>
+        `;
+        forecastContainer.appendChild(dayElement);
+    });
+}
+
+function useSampleData() {
+    showSampleDataNotification(true);
+    const now = Date.now() / 1000;
+    const sampleData = {
+        current: {
+            name: "Hồ Chí Minh (Mẫu)",
+            sys: { country: "VN" },
+            main: {
+                temp: 32,
+                feels_like: 35,
+                humidity: 75,
+                pressure: 1010
+            },
+            weather: [{
+                description: "mây thưa",
+                icon: "02d"
+            }],
+            wind: { speed: 2.5 } // m/s
+        },
+        forecast: {
+            list: [
+                { dt: now + 86400, main: { temp: 33 }, weather: [{ icon: "01d", description: "nắng đẹp" }] },
+                { dt: now + 172800, main: { temp: 31 }, weather: [{ icon: "09d", description: "mưa rào" }] },
+                { dt: now + 259200, main: { temp: 30 }, weather: [{ icon: "11d", description: "có dông" }] },
+                { dt: now + 345600, main: { temp: 32 }, weather: [{ icon: "02d", description: "ít mây" }] },
+                { dt: now + 432000, main: { temp: 33 }, weather: [{ icon: "01d", description: "quang mây" }] }
+            ]
+        }
+    };
+    displayWeather(sampleData);
+}
+
+async function updateWeather() {
+    showLoading();
+    showSampleDataNotification(false);
+    
+    try {
+        let data;
+        if (useGeo && currentPos) {
+            data = await fetchWeatherByCoords(currentPos.latitude, currentPos.longitude);
+        } else {
+            data = await fetchWeather(currentCity);
+        }
+        displayWeather(data);
+    } catch (error) {
+        console.error('Lỗi khi lấy dữ liệu thật:', error);
+        useSampleData(); // Fallback to sample data
+    } finally {
+        hideLoading();
+    }
+}
+
+function retryWeather() {
+    document.getElementById('error').style.display = 'none';
+    updateWeather();
+}
+
+function getUserLocation() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('Trình duyệt không hỗ trợ geolocation'));
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                currentPos = position.coords;
+                useGeo = true;
+                resolve(position.coords);
+            },
+            error => {
+                console.warn('Không lấy được vị trí:', error.message);
+                reject(error);
+            },
+            { timeout: 10000 } // Add timeout
+        );
+    });
+}
+
+async function initWidget() {
+    updateTime();
+    setInterval(updateTime, 60000);
+
+    document.getElementById('refresh-btn').addEventListener('click', () => {
+        // Reset geo flag if user manually refreshes without location button
+        // useGeo = false; 
+        updateWeather();
+    });
+
+    document.getElementById('location-btn').addEventListener('click', async () => {
+        showLoading();
+        try {
+            await getUserLocation();
+            updateWeather();
+        } catch (error) {
+            // Nếu lỗi vị trí, quay lại mặc định
+            useGeo = false;
+            updateWeather();
+        }
+    });
+
+    // Initial load
+    try {
+        // Thử lấy vị trí trước, nếu lâu quá hoặc fail thì dùng mặc định
+        // Logic: Gọi updateWeather ngay lập tức với mặc định, sau đó nếu có location thì update lại
+        updateWeather(); // Load default first for speed
+        
+        // Sau đó lẳng lặng thử lấy location
+        try {
+            await getUserLocation();
+            if(useGeo) updateWeather(); // Reload if location found
+        } catch(e) {
+            // Ignore silently
+        }
+    } catch (error) {
+        console.log('Init error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initWidget);
+</script>
+</body>
+</html>

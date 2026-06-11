@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ứng Dụng Thời Tiết</title>
+    <link rel="stylesheet" href="style.css" />
+
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@48,600,0,0"
+    />
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <h1>Ứng Dụng Thời Tiết</h1>
+        <p class="author">Built with ❤️ by d4m-dev</p>
+
+        <label for="unitType" class="switch">
+          <input type="checkbox" id="unitType" checked />
+          <div class="slider">
+            <span>Hệ Mét</span>
+          </div>
+        </label>
+      </header>
+
+      <form class="search-form">
+        <span class="material-symbols-outlined">search</span>
+        <input
+          type="text"
+          id="search"
+          placeholder="Nhập thành phố, tiểu bang hoặc quốc gia"
+          required
+        />
+      </form>
+
+      <section class="grid">
+        <div class="grid-item day-time">
+          <h2 class="location">Địa Điểm</h2>
+
+          <!-- weather data -->
+          <div class="weather-data">
+            <div>
+              <span class="temp">99.99</span>
+              <span class="unit">°C</span>
+            </div>
+
+            <div class="desc">Mô Tả</div>
+
+            <div>
+              <strong>H:</strong>
+              <span class="max">99.99 °C</span>
+              <strong>L:</strong>
+              <span class="min">99.99 °C</span>
+            </div>
+          </div>
+
+          <!-- weather icon -->
+          <img
+            src="https://refinedguides.com/weather-app/img/01d.png"
+            alt=""
+            class="weather-image"
+          />
+        </div>
+
+        <div class="grid-item">
+          <h5>Cảm Giác Như</h5>
+          <p class="feels-like">99.99 °C</p>
+        </div>
+
+        <div class="grid-item">
+          <h5>Độ Ẩm</h5>
+          <p class="humidity">99%</p>
+        </div>
+
+        <div class="grid-item">
+          <h5>Tốc Độ Gió</h5>
+          <p class="wind-speed">99.99 m/s</p>
+        </div>
+
+        <div class="grid-item">
+          <h5>Áp Suất</h5>
+          <p class="pressure">9999 hPa</p>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

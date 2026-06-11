@@ -1,0 +1,13 @@
+.DS_Store
+Thumbs.db
+node_modules/
+.env
+*.log
+.continue
+.venv
+my_project_env/
+venv/
+myenv/
+.vscode
+__pycache__/
+phpmyadmin/
