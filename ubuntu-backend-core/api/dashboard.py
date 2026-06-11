@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
 import psutil
-import platform
-import os
+from fastapi import APIRouter, Depends
 from core.security import verify_token
-from scripts.network_tunnel import start_tunnel, stop_tunnel, get_public_url
-from core.database import get_request_stats # Import hàm lấy dữ liệu biểu đồ
+
+# 🚀 ĐÃ SỬA: Import đầy đủ các hàm thực thi Tunnel
+from scripts.network_tunnel import get_tunnel_url, start_tunnel, stop_tunnel
 
 router = APIRouter(
     prefix="/api/dashboard",
@@ -12,62 +11,85 @@ router = APIRouter(
     dependencies=[Depends(verify_token)] 
 )
 
-tunnel_is_active = os.path.exists("/storage/emulated/0/coder/media/ubuntu-backend-core/core/.tunnel.pid")
-current_tunnel_url = get_public_url() if tunnel_is_active else None
-
+# ==========================================
+# CƠ SỞ DỮ LIỆU TẠM (RAM) LƯU TRẠNG THÁI API
+# ==========================================
 api_status_db = {
-    "internet_tunnel": {"active": tunnel_is_active, "description": "Kết nối Cloudflare đưa cổng 16868 ra Internet", "public_url": current_tunnel_url},
-    "chatbox_ai": {"active": True, "description": "API xử lý ngôn ngữ và quản lý tài nguyên AI", "public_url": None},
-    "social_db": {"active": True, "description": "API truy vấn cơ sở dữ liệu MariaDB", "public_url": None}
+    "internet_tunnel": {
+        "active": False,
+        "description": "Đường hầm Cloudflare bảo mật (Public URL)",
+        "public_url": ""
+    },
+    "chatbox_ai": {
+        "active": True,
+        "description": "Module Chatbot AI & Phân tích Log",
+        "public_url": ""
+    },
+    "social_db": {
+        "active": True,
+        "description": "Kết nối Database MariaDB Social Hub",
+        "public_url": ""
+    }
 }
 
 @router.get("/system-stats")
 async def get_system_stats():
+    """Lấy thông số phần cứng Real-time để vẽ biểu đồ lên Dashboard"""
+    cpu_percent = psutil.cpu_percent(interval=0.1)
     ram = psutil.virtual_memory()
-    disk = psutil.disk_usage('/storage/emulated/0/' if os.path.exists('/storage/emulated/0/') else '/')
+    disk = psutil.disk_usage('/')
+
     return {
-        "os": platform.system(),
-        "cpu_usage_percent": psutil.cpu_percent(interval=0.1),
+        "status": "success",
+        "cpu_usage_percent": cpu_percent,
         "ram": {
-            "total_gb": round(ram.total / (1024 ** 3), 2),
-            "used_gb": round(ram.used / (1024 ** 3), 2),
-            "percent": ram.percent
+            "percent": ram.percent,
+            "used_gb": round(ram.used / (1024**3), 2),
+            "total_gb": round(ram.total / (1024**3), 2)
         },
         "storage": {
-            "total_gb": round(disk.total / (1024 ** 3), 2),
-            "free_gb": round(disk.free / (1024 ** 3), 2),
-            "percent": disk.percent
+            "percent": disk.percent,
+            "free_gb": round(disk.free / (1024**3), 2),
+            "total_gb": round(disk.total / (1024**3), 2)
         }
     }
 
 @router.get("/services")
-async def get_services_status():
+async def get_services():
+    """Lấy danh sách và trạng thái của các API Service"""
+    # Nếu Tunnel đang bật, liên tục quét file log để lấy link public
     if api_status_db["internet_tunnel"]["active"]:
-        api_status_db["internet_tunnel"]["public_url"] = get_public_url()
+        api_status_db["internet_tunnel"]["public_url"] = get_tunnel_url()
     else:
-        api_status_db["internet_tunnel"]["public_url"] = None
-    return {"services": api_status_db}
+        api_status_db["internet_tunnel"]["public_url"] = ""
+        
+    return {"status": "success", "services": api_status_db}
 
 @router.post("/services/toggle/{service_name}")
 async def toggle_service(service_name: str):
-    if service_name not in api_status_db:
-        raise HTTPException(status_code=404, detail="Không tìm thấy dịch vụ này")
+    """Bật/Tắt công tắc của một dịch vụ API"""
+    if service_name in api_status_db:
+        current_state = api_status_db[service_name]["active"]
+        new_state = not current_state
         
-    current_status = api_status_db[service_name]["active"]
-    new_status = not current_status
-    public_url = None
+        # Cập nhật trạng thái mới vào bộ nhớ RAM
+        api_status_db[service_name]["active"] = new_state
+        
+        # ==========================================
+        # 🚀 KÍCH HOẠT / TẮT TIẾN TRÌNH THỰC TẾ
+        # ==========================================
+        if service_name == "internet_tunnel":
+            if new_state:
+                start_tunnel()
+            else:
+                stop_tunnel()
+                
+        # Trả về kết quả để Frontend UI cập nhật hiệu ứng
+        return {
+            "status": "success", 
+            "message": f"Đã {'BẬT' if new_state else 'TẮT'} dịch vụ {service_name}",
+            "service": service_name, 
+            "active": new_state
+        }
     
-    if service_name == "internet_tunnel":
-        if new_status: success, public_url = start_tunnel()
-        else: success = stop_tunnel()
-        if not success: raise HTTPException(status_code=500, detail="Lỗi Tunnel")
-            
-    api_status_db[service_name]["active"] = new_status
-    api_status_db[service_name]["public_url"] = public_url
-    return {"status": "success", "service": service_name, "is_active": new_status, "public_url": public_url}
-
-# --- API BIỂU ĐỒ (MỚI) ---
-@router.get("/analytics")
-async def get_analytics_data():
-    """API cung cấp dữ liệu cho biểu đồ Chart.js"""
-    return get_request_stats()
+    return {"status": "error", "message": "Dịch vụ không tồn tại trong hệ thống."}

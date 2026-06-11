@@ -1,43 +1,37 @@
-// File: public/js/terminal.js
-const WS_URL = "ws://192.168.110.2:16868/ws/logs";
+// Tự động nhận diện dùng ws:// (localhost) hoặc wss:// (nếu chạy qua Cloudflare Tunnel)
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+// Tự động lấy port 16868 hoặc domain tunnel hiện tại
+const wsUrl = `${protocol}//${window.location.host}/api/ws/terminal`;
+
+const termOutput = document.getElementById('terminal-output');
 let ws;
 
-function connectWebSocket() {
-    ws = new WebSocket(WS_URL);
-    const terminalOutput = document.getElementById('terminal-output');
-
-    ws.onopen = () => {
-        appendLog('<span class="text-blue-400">✅ Đã kết nối đường truyền. Bắt đầu nhận log...</span>');
-    };
-
-    ws.onmessage = (event) => {
-        const logMessage = event.data;
-        let colorClass = "text-gray-300"; // Mặc định
-        
-        // Phân loại màu sắc theo mã HTTP trạng thái
-        if (logMessage.includes(" 200 ")) colorClass = "text-green-400";
-        else if (logMessage.includes(" 404 ") || logMessage.includes(" 403 ") || logMessage.includes(" 422 ")) colorClass = "text-yellow-400";
-        else if (logMessage.includes(" 500 ")) colorClass = "text-red-500";
-        
-        appendLog(`<span class="${colorClass}">${logMessage}</span>`);
-    };
-
-    ws.onclose = () => {
-        appendLog('<span class="text-red-500">❌ Mất kết nối. Đang thử kết nối lại sau 3s...</span>');
-        setTimeout(connectWebSocket, 3000);
-    };
-}
-
-function appendLog(htmlContent) {
-    const terminalOutput = document.getElementById('terminal-output');
-    const newLine = document.createElement('div');
-    newLine.innerHTML = htmlContent;
-    terminalOutput.appendChild(newLine);
+function initTerminal() {
+    termOutput.innerHTML = '<div class="text-yellow-400 mb-1">Đang thiết lập kết nối mã hóa tới lõi máy chủ...</div>';
     
-    // Tự động cuộn xuống dòng mới nhất
-    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+    ws = new WebSocket(wsUrl);
+    
+    ws.onopen = function() {
+        termOutput.innerHTML += '<div class="text-green-500 mb-1">Kết nối thành công! Sẵn sàng nhận lệnh.</div>';
+    };
+    
+    ws.onmessage = function(event) {
+        const text = event.data;
+        const div = document.createElement('div');
+        // Định dạng text cho đẹp
+        div.className = text.includes('LỖI:') ? 'text-red-400' : 'text-gray-300';
+        div.textContent = text;
+        termOutput.appendChild(div);
+        termOutput.scrollTop = termOutput.scrollHeight;
+    };
+    
+    ws.onclose = function() {
+        termOutput.innerHTML += '<div class="text-red-500 mb-1 font-bold">❌ Mất kết nối Terminal. Đang thử lại sau 3s...</div>';
+        setTimeout(initTerminal, 3000); // Tự động kết nối lại
+    };
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    connectWebSocket();
-});
+// Bắt sự kiện khi người dùng gõ phím (nếu bạn có input riêng cho terminal)
+// Hiện tại terminal chỉ đang hiển thị log, nếu muốn gõ lệnh, chúng ta có thể mở rộng sau.
+
+document.addEventListener('DOMContentLoaded', initTerminal);

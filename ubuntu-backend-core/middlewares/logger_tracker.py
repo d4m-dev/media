@@ -1,35 +1,30 @@
+import asyncio
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from core.database import log_request
 from api.websockets import manager
-import time
-from datetime import datetime
 
 class LoggerTrackerMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        client_ip = request.client.host
-        path = request.url.path
+        # 1. Bóc tách thông tin thiết bị truy cập
+        client_ip = request.client.host if request.client else "Unknown"
         method = request.method
+        path = request.url.path
         
-        # Bỏ qua việc in log cho các API chạy liên tục ngầm (tránh rác màn hình)
-        if path.startswith("/api/dashboard/system-stats") or path.startswith("/api/dashboard/analytics"):
-            return await call_next(request)
-
-        start_time = time.time()
-        
+        # 2. Xử lý request để lấy mã trạng thái (200, 404, 500...)
         response = await call_next(request)
-        
-        process_time = round((time.time() - start_time) * 1000, 2)
         status_code = response.status_code
         
-        # Lưu vào cơ sở dữ liệu (SQLite)
+        # 3. Lưu vào Database SQLite để AI SysAdmin đọc
         log_request(client_ip, method, path, status_code)
         
-        # Bắn log realtime qua WebSocket cho Terminal trên Web
-        current_time = datetime.now().strftime("%H:%M:%S")
-        log_message = f"[{current_time}] {client_ip} | {method} {path} | {status_code} | {process_time}ms"
+        # 4. Phát sóng thời gian thực (Real-time broadcast) cho Dashboard
+        log_message = f"[{method}] {path} - Status: {status_code} - IP: {client_ip}"
         
-        import asyncio
-        asyncio.create_task(manager.broadcast(log_message))
+        # Chạy tác vụ bắn log ngầm để không làm chậm luồng chính
+        try:
+            asyncio.create_task(manager.broadcast(log_message))
+        except Exception:
+            pass
         
         return response

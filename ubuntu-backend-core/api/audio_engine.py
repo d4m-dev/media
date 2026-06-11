@@ -22,9 +22,9 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 @router.post("/extract-mp3")
 async def extract_mp3_from_video(file: UploadFile = File(...)):
-    """API Tách tiếng Video: Nhận MP4, trả về MP3"""
+    """API Tách tiếng Video: Nhận MP4, trả về MP3 320kbps"""
     if not file.filename.endswith(('.mp4', '.mkv', '.mov')):
-        raise HTTPException(status_code=400, detail="Chỉ hỗ trợ file định dạng video (.mp4, .mkv, .mov)")
+        raise HTTPException(status_code=400, detail="Chỉ hỗ trợ định dạng video (.mp4, .mkv, .mov)")
 
     input_path = os.path.join(INPUT_DIR, file.filename)
     output_filename = f"{os.path.splitext(file.filename)[0]}.mp3"
@@ -41,27 +41,24 @@ async def extract_mp3_from_video(file: UploadFile = File(...)):
         ]
         
         process = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        
         if process.returncode != 0:
-            raise Exception("Lỗi FFmpeg khi trích xuất âm thanh.")
+            raise Exception("Lỗi FFmpeg khi bóc tách luồng âm thanh.")
 
         return {
             "status": "success",
-            "message": "✅ Tách nhạc MP3 thành công!",
+            "message": "✅ Tách tiếng video thành công!",
             "file_name": output_filename,
             "download_url": f"/audio-files/{output_filename}"
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if os.path.exists(input_path):
             os.remove(input_path)
 
-
 @router.post("/remove-vocal")
 async def remove_vocal(file: UploadFile = File(...)):
-    """API Tách Lời & Beat: Sử dụng AI Demucs (Facebook Meta)"""
+    """API Tách Lời & Beat: Phân tách âm thanh đa tầng bằng Demucs AI"""
     if not file.filename.endswith(('.mp3', '.wav', '.flac', '.m4a')):
         raise HTTPException(status_code=400, detail="Chỉ hỗ trợ file âm thanh (.mp3, .wav, .flac, .m4a)")
 
@@ -73,7 +70,7 @@ async def remove_vocal(file: UploadFile = File(...)):
             content = await file.read()
             await out_file.write(content)
 
-        # 🚀 Gọi AI Demucs: Cấu hình tách 2 dải (vocals và beat) chạy trên CPU
+        # Sử dụng mô hình htdemucs chạy tác vụ trên nhân CPU cục bộ
         command = [
             "demucs", "--two-stems=vocals", 
             "-d", "cpu", 
@@ -82,11 +79,9 @@ async def remove_vocal(file: UploadFile = File(...)):
         ]
         
         process = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
         if process.returncode != 0:
-            raise Exception("Lỗi AI Demucs khi phân tách tầng âm.")
+            raise Exception("Lỗi Động cơ AI Demucs khi phân rã bài hát.")
 
-        # Demucs sẽ lưu kết quả tại: outputs/htdemucs/<tên_file>/
         result_dir = os.path.join(OUTPUT_DIR, "htdemucs", base_name)
         vocal_path = os.path.join(result_dir, "vocals.wav")
         beat_path = os.path.join(result_dir, "no_vocals.wav")
@@ -97,16 +92,14 @@ async def remove_vocal(file: UploadFile = File(...)):
         if os.path.exists(vocal_path) and os.path.exists(beat_path):
             shutil.move(vocal_path, os.path.join(OUTPUT_DIR, final_vocal))
             shutil.move(beat_path, os.path.join(OUTPUT_DIR, final_beat))
-            # Xóa thư mục tạm của Demucs
             shutil.rmtree(os.path.join(OUTPUT_DIR, "htdemucs")) 
 
         return {
             "status": "success",
-            "message": "✅ Đã tách Vocal và Beat bằng Demucs hoàn tất!",
+            "message": "✅ Demucs AI bóc tách giọng hát hoàn tất!",
             "vocal_url": f"/audio-files/{final_vocal}",
             "beat_url": f"/audio-files/{final_beat}"
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
