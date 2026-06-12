@@ -1,9 +1,11 @@
 import psutil
+import time
 from fastapi import APIRouter, Depends
 from core.security import verify_token
-
-# 🚀 ĐÃ SỬA: Import đầy đủ các hàm thực thi Tunnel
 from scripts.network_tunnel import get_tunnel_url, start_tunnel, stop_tunnel
+
+# Nhập hàm trích xuất log từ database
+from core.database import get_request_stats 
 
 router = APIRouter(
     prefix="/api/dashboard",
@@ -11,25 +13,11 @@ router = APIRouter(
     dependencies=[Depends(verify_token)] 
 )
 
-# ==========================================
-# CƠ SỞ DỮ LIỆU TẠM (RAM) LƯU TRẠNG THÁI API
-# ==========================================
+# Cơ sở dữ liệu tạm (RAM) lưu trạng thái API
 api_status_db = {
-    "internet_tunnel": {
-        "active": False,
-        "description": "Đường hầm Cloudflare bảo mật (Public URL)",
-        "public_url": ""
-    },
-    "chatbox_ai": {
-        "active": True,
-        "description": "Module Chatbot AI & Phân tích Log",
-        "public_url": ""
-    },
-    "social_db": {
-        "active": True,
-        "description": "Kết nối Database MariaDB Social Hub",
-        "public_url": ""
-    }
+    "internet_tunnel": {"active": False, "description": "Đường hầm Cloudflare bảo mật", "public_url": ""},
+    "chatbox_ai": {"active": True, "description": "Module Chatbot AI & Phân tích Log", "public_url": ""},
+    "social_db": {"active": True, "description": "Kết nối Database MariaDB Social Hub", "public_url": ""}
 }
 
 @router.get("/system-stats")
@@ -58,10 +46,8 @@ async def get_system_stats():
 async def get_services():
     """Lấy danh sách và trạng thái của các API Service"""
     # Nếu Tunnel đang bật, liên tục quét file log để lấy link public
-    if api_status_db["internet_tunnel"]["active"]:
+    if api_status_db["internet_tunnel"]["active"] and not api_status_db["internet_tunnel"]["public_url"]:
         api_status_db["internet_tunnel"]["public_url"] = get_tunnel_url()
-    else:
-        api_status_db["internet_tunnel"]["public_url"] = ""
         
     return {"status": "success", "services": api_status_db}
 
@@ -71,25 +57,37 @@ async def toggle_service(service_name: str):
     if service_name in api_status_db:
         current_state = api_status_db[service_name]["active"]
         new_state = not current_state
-        
-        # Cập nhật trạng thái mới vào bộ nhớ RAM
         api_status_db[service_name]["active"] = new_state
         
-        # ==========================================
-        # 🚀 KÍCH HOẠT / TẮT TIẾN TRÌNH THỰC TẾ
-        # ==========================================
         if service_name == "internet_tunnel":
             if new_state:
                 start_tunnel()
+                # Ép hệ thống truy quét log liên tục để bắt link trả về UI ngay lập tức
+                for _ in range(15):
+                    time.sleep(0.2)
+                    url = get_tunnel_url()
+                    if url:
+                        api_status_db["internet_tunnel"]["public_url"] = url
+                        break
             else:
                 stop_tunnel()
+                api_status_db["internet_tunnel"]["public_url"] = ""
                 
-        # Trả về kết quả để Frontend UI cập nhật hiệu ứng
         return {
             "status": "success", 
-            "message": f"Đã {'BẬT' if new_state else 'TẮT'} dịch vụ {service_name}",
+            "message": f"Đã {'BẬT' if new_state else 'TẮT'} dịch vụ {service_name}", 
             "service": service_name, 
             "active": new_state
         }
     
     return {"status": "error", "message": "Dịch vụ không tồn tại trong hệ thống."}
+
+@router.get("/analytics")
+async def get_traffic_analytics():
+    """Cung cấp dữ liệu Log thực tế để vẽ biểu đồ Traffic Chart"""
+    try:
+        # Lấy dữ liệu timeline từ database SQLite
+        stats = get_request_stats()
+        return {"status": "success", "data": stats["timeline"]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

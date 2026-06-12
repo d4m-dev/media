@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
+from core.telegram import telegram_polling_task
 import asyncio
 import os
 
@@ -22,8 +23,10 @@ async def lifespan(app: FastAPI):
     db_manager.connect()   
     db_manager.init_social_tables() 
     task = asyncio.create_task(ai_janitor_task())
+    task_telegram = asyncio.create_task(telegram_polling_task())
     yield 
-    task.cancel() 
+    task.cancel()
+    task_telegram.cancel()
     if db_manager.connection:
         db_manager.connection.close() 
 

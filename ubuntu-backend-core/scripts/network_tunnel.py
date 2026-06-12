@@ -1,12 +1,11 @@
 import os
 import re
-import time
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_FILE = os.path.join(BASE_DIR, "cloudflare.log")
 
 def start_tunnel():
-    """Bật đường hầm Cloudflare cho port 16868"""
+    """Bật đường hầm Cloudflare"""
     stop_tunnel()
     if os.path.exists(LOG_FILE):
         try:
@@ -14,7 +13,7 @@ def start_tunnel():
         except:
             pass
     
-    # 🚀 FIX: Dùng đường dẫn tuyệt đối /usr/bin/cloudflared thay vì gọi tên chung chung
+    # Kích hoạt tunnel trỏ về cổng 16868 của hệ thống
     cmd = f"/usr/bin/cloudflared tunnel --url http://127.0.0.1:16868 > {LOG_FILE} 2>&1 &"
     os.system(cmd)
 
@@ -30,7 +29,6 @@ def get_tunnel_url():
     try:
         with open(LOG_FILE, "r", encoding="utf-8") as f:
             content = f.read()
-            # Quét tìm URL dạng trycloudflare.com
             match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', content)
             if match:
                 return match.group(0)
