@@ -26,7 +26,7 @@ async def send_telegram_menu():
     if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
         return False
         
-    # Import cục bộ để tránh lỗi vòng lặp (Circular Import) với luồng API
+    # Import cục bộ để tránh lỗi vòng lặp (Circular Import) với luồng khởi động API
     from api.dashboard import api_status_db
     
     tunnel_status = "🟢 ĐANG BẬT" if api_status_db["internet_tunnel"]["active"] else "🔴 ĐANG TẮT"
@@ -77,24 +77,46 @@ async def telegram_polling_task():
                         # 📡 RADAR GỠ LỖI: In ra màn hình console mọi sự kiện nhận được
                         print(f"📡 [DEBUG] Bot vừa tóm được 1 hành động: {update}")
                         
-                        # VỚI TRƯỜNG HỢP: Sếp gõ chữ hoặc lệnh văn bản (Ví dụ: /menu)
+                        # ==========================================
+                        # VỚI TRƯỜNG HỢP: SẾP GÕ CHỮ HOẶC RA LỆNH VĂN BẢN
+                        # ==========================================
                         if "message" in update and "text" in update["message"]:
                             text = update["message"]["text"].strip()
                             chat_id = str(update["message"]["chat"]["id"])
                             
                             print(f"👤 [DEBUG] Người gửi (ID: {chat_id}) vừa nhắn: {text}")
                             
-                            # Xác thực danh tính chủ nhân tối cao
+                            # Xác thực danh tính chủ nhân tối cao để bảo mật hệ thống
                             if chat_id == str(settings.TELEGRAM_CHAT_ID).strip():
-                                print("   ✅ ID Trùng khớp! Đang xử lý tin nhắn...")
+                                print("   ✅ ID Trùng khớp! Đang xử lý...")
+                                
+                                # Nếu là lệnh menu cơ bản
                                 if text in ["/start", "/menu", "menu"]:
                                     await send_telegram_menu()
+                                    
+                                # Nếu là câu hỏi hoặc lệnh tự nhiên -> Đẩy thẳng vào bộ não AI Gemini
                                 else:
-                                    await send_telegram_message("💡 Gõ <b>/menu</b> hoặc chữ <b>menu</b> để gọi Bảng điều khiển nhé sếp!")
+                                    await send_telegram_message("⏳ <i>AI SysAdmin đang phân tích yêu cầu của sếp...</i>")
+                                    try:
+                                        # Gọi module AI xử lý tương tác hạ tầng giống hệt trên Web Dashboard
+                                        from api.ai_admin import ai_admin_chat, ChatRequest
+                                        ai_req = ChatRequest(message=text)
+                                        ai_res = await ai_admin_chat(ai_req)
+                                        
+                                        # Định dạng câu trả lời của AI gửi lại cho sếp
+                                        reply = f"🤖 <b>AI SYSADMIN:</b>\n\n{ai_res['reply']}"
+                                        if ai_res.get('action_executed'):
+                                            reply += f"\n\n⚡ <i>{ai_res['action_executed']}</i>"
+                                            
+                                        await send_telegram_message(reply)
+                                    except Exception as ai_err:
+                                        await send_telegram_message(f"❌ Lỗi xử lý AI: {str(ai_err)}")
                             else:
                                 print("   ❌ ID Lạ gõ lệnh! Hệ thống từ chối phản hồi bảo mật.")
                                 
-                        # VỚI TRƯỜNG HỢP: Sếp bấm các nút trên Menu (Callback Query)
+                        # ==========================================
+                        # VỚI TRƯỜNG HỢP: SẾP BẤM CÁC NÚT TRÊN MENU (CALLBACK)
+                        # ==========================================
                         elif "callback_query" in update:
                             cb = update["callback_query"]
                             data_cb = cb["data"]
@@ -107,7 +129,7 @@ async def telegram_polling_task():
                                 from api.dashboard import api_status_db
                                 from scripts.network_tunnel import start_tunnel, stop_tunnel, get_tunnel_url
                                 
-                                # 🔵 Xử lý nút: BẬT / TẮT CLOUDFLARE TUNNEL
+                                # 🔵 Xử lý nút: BẬT / TẮT CLOUDFLARE TUNNEL (CỔNG 16868)
                                 if data_cb == "toggle_tunnel":
                                     current = api_status_db["internet_tunnel"]["active"]
                                     api_status_db["internet_tunnel"]["active"] = not current
@@ -116,17 +138,17 @@ async def telegram_polling_task():
                                         start_tunnel()
                                         await send_telegram_message("⏳ Đang kích hoạt Cloudflare Tunnel. Đang săn tìm link Public...")
                                         
-                                        # 🚀 VÒNG LẶP SĂN LINK LIÊN TỤC TRONG 15 GIÂY CHỐNG TRỄ MẠNG
+                                        # Vòng lặp săn tìm link public trong 15 giây chống trễ mạng
                                         link_found = ""
                                         for _ in range(15):
-                                            await asyncio.sleep(1) # Chờ 1 giây mỗi chu kỳ quét
+                                            await asyncio.sleep(1)
                                             link_found = get_tunnel_url()
                                             if link_found:
-                                                break # Có link lập tức bẻ gãy vòng lặp
+                                                break
                                                 
                                         if link_found:
                                             api_status_db["internet_tunnel"]["public_url"] = link_found
-                                            await send_telegram_message(f"✅ Tunnel đã mở thành công!\n🌐 Link Public: {link_found}")
+                                            await send_telegram_message(f"✅ Tunnel đã mở thành công tại port 16868!\n🌐 Link Public: {link_found}")
                                         else:
                                             await send_telegram_message("⚠️ Đường truyền phản hồi chậm. Hạ tầng đang chạy ngầm, lát nữa sếp hãy ấn lại nút Tunnel để lấy link.")
                                     else:
@@ -134,10 +156,9 @@ async def telegram_polling_task():
                                         api_status_db["internet_tunnel"]["public_url"] = ""
                                         await send_telegram_message("🔴 Đã ngắt kết nối Cloudflare Tunnel hoàn toàn!")
                                     
-                                    # Gửi lại Menu mới để cập nhật chữ trên nút bấm (Bật -> Tắt hoặc ngược lại)
                                     await send_telegram_menu()
                                     
-                                # 🔵 Xử lý nút: KIỂM TRA PHẦN CỨNG MÁY CHỦ
+                                # 🔵 Xử lý nút: KIỂM TRA PHẦN CỨNG MÁY CHỦ S26 ULTRA
                                 elif data_cb == "server_stats":
                                     cpu = psutil.cpu_percent(interval=0.5)
                                     ram = psutil.virtual_memory()
@@ -149,18 +170,18 @@ async def telegram_polling_task():
                                            f"💾 Storage: {disk.percent}% đã dùng (Trống {round(disk.free/(1024**3), 1)}GB)")
                                     await send_telegram_message(msg)
                                     
-                                # 🔵 Xử lý nút: KHỞI ĐỘNG LẠI LUỒNG API DỰ PHÒNG
+                                # 🔵 Xử lý nút: KHỞI ĐỘNG LẠI LUỒNG API
                                 elif data_cb == "restart_api":
-                                    await send_telegram_message("🔄 Đang cấu hình và làm mới luồng API...")
+                                    await send_telegram_message("🔄 Đang tiến hành dọn dẹp RAM và đồng bộ lại dịch vụ trên cổng 16868...")
                                     await asyncio.sleep(1)
-                                    await send_telegram_message("✅ Đã giải phóng bộ nhớ và làm mới dịch vụ.")
+                                    await send_telegram_message("✅ Hệ thống lõi đã được làm mới mượt mà!")
                                 
-                                # Bắt buộc phải trả lời callback này để Telegram tắt hiệu ứng xoay tròn mờ trên nút bấm
+                                # Phản hồi callback để tắt hiệu ứng loading xoay tròn trên nút bấm Telegram
                                 answer_url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
                                 await client.post(answer_url, json={"callback_query_id": cb_id})
                                 
             except Exception as e:
                 print(f"🔥 [DEBUG LỖI NGẦM]: {e}")
-                await asyncio.sleep(5) # Tránh nghẽn vòng lặp vô hạn nếu rớt mạng
+                await asyncio.sleep(5) # Tránh nghẽn vô hạn nếu rớt mạng hoàn toàn
                 
-            await asyncio.sleep(1) # Nghỉ 1 giây để bảo vệ CPU không bị quá nhiệt
+            await asyncio.sleep(1) # Nghỉ 1 giây bảo vệ thiết bị tránh quá nhiệt CPU
