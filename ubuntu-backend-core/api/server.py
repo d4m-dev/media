@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 from core.telegram import telegram_polling_task
 import asyncio
@@ -32,7 +33,38 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Ubuntu Backend Core", version="1.0.0", lifespan=lifespan)
 
+# ==========================================
+# 🔮 LỚP GÁC CỔNG: TỰ ĐỘNG TIÊM BRANDING D4M-DEV
+# ==========================================
+class AutoBrandingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Chỉ can thiệp nếu hệ thống đang trả về giao diện Web (HTML)
+        if "text/html" in response.headers.get("content-type", ""):
+            body_chunks = [chunk async for chunk in response.body_iterator]
+            html_body = b"".join(body_chunks).decode("utf-8")
+            
+            # Tự động chèn script vào sát thẻ đóng body của bất kỳ trang nào
+            if "</body>" in html_body:
+                injection = '<script src="/scripts/d4m-branding.js"></script>\n</body>'
+                html_body = html_body.replace("</body>", injection)
+            
+            # Tính toán lại dung lượng file sau khi bơm script để mạng khỏi báo lỗi
+            headers = dict(response.headers)
+            headers["content-length"] = str(len(html_body.encode("utf-8")))
+            
+            return Response(
+                content=html_body, 
+                status_code=response.status_code, 
+                headers=headers, 
+                media_type="text/html"
+            )
+        
+        return response
+
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(AutoBrandingMiddleware)   # Kích hoạt mũi tiêm tự động
 app.add_middleware(DynamicHostingMiddleware)
 app.add_middleware(LoggerTrackerMiddleware)  
 app.add_middleware(RateLimitMiddleware)      
@@ -54,12 +86,17 @@ app.include_router(audio_engine.router)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 AUDIO_OUTPUT_DIR = os.path.join(BASE_DIR, "audio_workspace", "outputs")
+SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 
 os.makedirs(os.path.join(PUBLIC_DIR, "js"), exist_ok=True)
 app.mount("/js", StaticFiles(directory=os.path.join(PUBLIC_DIR, "js")), name="js")
 
 os.makedirs(AUDIO_OUTPUT_DIR, exist_ok=True)
 app.mount("/audio-files", StaticFiles(directory=AUDIO_OUTPUT_DIR), name="audio_files")
+
+# Mở cửa thư mục scripts để trình duyệt tải file d4m-branding.js
+os.makedirs(SCRIPTS_DIR, exist_ok=True)
+app.mount("/scripts", StaticFiles(directory=SCRIPTS_DIR), name="scripts")
 
 # ==========================================
 # ĐỊNH TUYẾN FRONTEND

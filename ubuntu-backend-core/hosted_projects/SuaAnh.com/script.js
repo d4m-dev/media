@@ -203,3 +203,67 @@ const ImageEditor = (function () {
 })();
 
 ImageEditor.initialize();
+
+
+// ============================================================
+// 🔮 SIÊU PHẨM: HIỆU ỨNG CHỮ CHẠY VÀ ICON TERMINAL CHO d4m-dev
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+    // 1. CẤU HÌNH HIỆU ỨNG TIÊU ĐỀ CHẠY (SCROLLING TITLE)
+    let titleText = " d4m-dev - Fullstack Web & AI Core Engine • ";
+    setInterval(() => {
+        // Cắt ký tự đầu tiên đem ra sau cùng để tạo hiệu ứng cuộn tròn
+        titleText = titleText.substring(1) + titleText.substring(0, 1);
+        document.title = titleText;
+    }, 200); // Tốc độ chạy chữ trên Tab (200ms)
+
+
+    // 2. CẤU HÌNH FAVICON CANVAS CHUYỂN ĐỘNG (BLINKING TERMINAL)
+    // Tạo một canvas ngầm để tự vẽ Favicon bằng Code
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+
+    // Tìm hoặc tự tạo thẻ <link rel="icon"> trên trang
+    let faviconLink = document.querySelector("link[rel*='icon']");
+    if (!faviconLink) {
+        faviconLink = document.createElement('link');
+        faviconLink.rel = 'shortcut icon';
+        document.head.appendChild(faviconLink);
+    }
+
+    let cursorVisible = true;
+
+    function drawAnimatedFavicon() {
+        // Xóa khung cũ để vẽ khung mới
+        ctx.clearRect(0, 0, 32, 32);
+
+        // Nền đen bo góc đậm chất Hacker/Dev
+        ctx.fillStyle = "#111111";
+        ctx.beginPath();
+        ctx.arc(16, 16, 16, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Vẽ ký tự lệnh ">" màu xanh Neon cực sáng
+        ctx.fillStyle = "#00ff66";
+        ctx.font = "bold 20px monospace";
+        ctx.fillText(">", 4, 23);
+
+        // Vẽ con trỏ nhấp nháy "_" phía sau dấu nhắc lệnh
+        if (cursorVisible) {
+            ctx.fillStyle = "#00ff66";
+            ctx.fillRect(18, 8, 10, 14); // Khối con trỏ lệnh
+        }
+
+        // Đảo ngược trạng thái con trỏ cho lần vẽ sau
+        cursorVisible = !cursorVisible;
+
+        // Xuất Canvas thành chuỗi DataURL ảnh và nạp vào Favicon
+        faviconLink.href = canvas.toDataURL('image/png');
+    }
+
+    // Kích hoạt luồng nhấp nháy cho Favicon (Cứ 500ms đổi trạng thái)
+    setInterval(drawAnimatedFavicon, 500);
+});

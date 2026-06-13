@@ -244,11 +244,13 @@ async def telegram_polling_task():
                                 elif text in ["/start", "/menu", "menu"]:
                                     await send_telegram_menu()
                                 else:
-                                    await send_telegram_message("⏳ <i>AI SysAdmin đang phân tích...</i>")
+                                    await send_telegram_message("⏳ <i>AI đang suy nghĩ...</i>")
                                     try:
-                                        from api.ai_admin import ai_admin_chat, ChatRequest
-                                        ai_res = await ai_admin_chat(ChatRequest(message=text))
-                                        reply = f"🤖 <b>AI SYSADMIN:</b>\n\n{ai_res['reply']}"
+                                        # 🚀 GỌI NÃO BỘ MỚI TẠI ĐÂY
+                                        from core.bot_ai import process_telegram_ai
+                                        ai_res = await process_telegram_ai(chat_id, text)
+                                        
+                                        reply = f"🤖 <b>AI:</b>\n\n{ai_res['reply']}"
                                         if ai_res.get('action_executed'): 
                                             reply += f"\n\n⚡ <i>{ai_res['action_executed']}</i>"
                                         await send_telegram_message(reply)
