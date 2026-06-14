@@ -24,41 +24,50 @@ def init_db():
     conn.close()
 
 def log_request(ip, method, path, status_code):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO access_logs (ip_address, method, path, status_code) VALUES (?, ?, ?, ?)",
-        (ip, method, path, status_code)
-    )
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO access_logs (ip_address, method, path, status_code) VALUES (?, ?, ?, ?)",
+            (ip, method, path, status_code)
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Lỗi ghi log SQLite: {e}")
 
 def get_request_stats():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT substr(datetime(timestamp, 'localtime'), 12, 5) as minute, COUNT(*)
-        FROM access_logs
-        GROUP BY minute
-        ORDER BY minute DESC
-        LIMIT 10
-    ''')
-    rows = cursor.fetchall()
-    conn.close()
-    rows.reverse()
-    return {"timeline": [{"time": row[0], "count": row[1]} for row in rows]}
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT substr(datetime(timestamp, 'localtime'), 12, 5) as minute, COUNT(*)
+            FROM access_logs
+            GROUP BY minute
+            ORDER BY minute DESC
+            LIMIT 10
+        ''')
+        rows = cursor.fetchall()
+        conn.close()
+        rows.reverse()
+        return {"timeline": [{"time": row[0], "count": row[1]} for row in rows]}
+    except Exception:
+        return {"timeline": []}
 
 def get_raw_logs(limit=30):
     """Trích xuất nhật ký dạng chuỗi văn bản thô cho AI đọc hiểu"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT datetime(timestamp, 'localtime'), ip_address, method, path, status_code 
-        FROM access_logs ORDER BY id DESC LIMIT ?
-    ''', (limit,))
-    rows = cursor.fetchall()
-    conn.close()
-    return "\n".join([f"[{r[0]}] IP: {r[1]} | {r[2]} {r[3]} | Status: {r[4]}" for r in rows])
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT datetime(timestamp, 'localtime'), ip_address, method, path, status_code 
+            FROM access_logs ORDER BY id DESC LIMIT ?
+        ''', (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return "\n".join([f"[{r[0]}] IP: {r[1]} | {r[2]} {r[3]} | Status: {r[4]}" for r in rows])
+    except Exception:
+        return "Không thể đọc Access Logs."
 
 # --- PHẦN 2: MARIADB CHO SOCIAL SERVICES ---
 class MariaDBConnection:
@@ -72,9 +81,10 @@ class MariaDBConnection:
                 password=settings.DB_PASS, database=settings.DB_NAME, cursorclass=pymysql.cursors.DictCursor
             )
         except Exception as e:
-            print(f"⚠️ Không thể kết nối MariaDB: {e}")
+            print(f"⚠️ Không thể kết nối MariaDB (Sẽ thử lại sau): {e}")
 
     def get_connection(self):
+        # Đảm bảo connection đang hoạt động, nếu mất kết nối thì tự reconnect
         if not self.connection or not self.connection.open:
             self.connect()
         return self.connection
