@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from core.security import verify_token
 from scripts.network_tunnel import get_tunnel_url, start_tunnel, stop_tunnel
 
-# Nhập hàm trích xuất log từ database
-from core.database import get_request_stats 
+# Nhập hàm trích xuất log và db_manager từ database
+from core.database import get_request_stats, db_manager 
 
 router = APIRouter(
     prefix="/api/dashboard",
@@ -45,7 +45,6 @@ async def get_system_stats():
 @router.get("/services")
 async def get_services():
     """Lấy danh sách và trạng thái của các API Service"""
-    # Nếu Tunnel đang bật, liên tục quét file log để lấy link public
     if api_status_db["internet_tunnel"]["active"] and not api_status_db["internet_tunnel"]["public_url"]:
         api_status_db["internet_tunnel"]["public_url"] = get_tunnel_url()
         
@@ -62,7 +61,6 @@ async def toggle_service(service_name: str):
         if service_name == "internet_tunnel":
             if new_state:
                 start_tunnel()
-                # Ép hệ thống truy quét log liên tục để bắt link trả về UI ngay lập tức
                 for _ in range(15):
                     time.sleep(0.2)
                     url = get_tunnel_url()
@@ -86,8 +84,56 @@ async def toggle_service(service_name: str):
 async def get_traffic_analytics():
     """Cung cấp dữ liệu Log thực tế để vẽ biểu đồ Traffic Chart"""
     try:
-        # Lấy dữ liệu timeline từ database SQLite
         stats = get_request_stats()
         return {"status": "success", "data": stats["timeline"]}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+# ==========================================
+# 🚀 NÂNG CẤP MỚI: API Thống kê Tracking Bio
+# ==========================================
+@router.get("/bio-stats")
+async def get_bio_stats():
+    """Lấy dữ liệu Tracking ngầm từ MariaDB cho Link-in-Bio"""
+    if not getattr(db_manager, "connection", None):
+        return {"status": "error", "message": "Mất kết nối tới MariaDB"}
+
+    try:
+        cursor = db_manager.connection.cursor()
+        
+        cursor.execute("SELECT COUNT(*) FROM bio_tracking")
+        total_clicks = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT platform, COUNT(*) as count 
+            FROM bio_tracking 
+            GROUP BY platform 
+            ORDER BY count DESC
+        """)
+        platforms = [{"name": row[0], "count": row[1]} for row in cursor.fetchall()]
+
+        cursor.execute("""
+            SELECT link_id, platform, ip_address, clicked_at 
+            FROM bio_tracking 
+            ORDER BY clicked_at DESC 
+            LIMIT 10
+        """)
+        recent_clicks = [
+            {
+                "link_id": row[0],
+                "platform": row[1],
+                "ip_address": row[2],
+                "time": row[3].strftime("%H:%M - %d/%m/%Y") if row[3] else "Unknown"
+            }
+            for row in cursor.fetchall()
+        ]
+        cursor.close()
+
+        return {
+            "status": "success",
+            "total_clicks": total_clicks,
+            "platform_stats": platforms,
+            "recent_history": recent_clicks
+        }
     except Exception as e:
         return {"status": "error", "message": str(e)}

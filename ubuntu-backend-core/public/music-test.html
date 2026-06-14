@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Pro Premium</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: white; min-height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .glass-box { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); }
+        .lyrics-container, .playlist-container { overflow-y: auto; scroll-behavior: smooth; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 10px; }
+        .lyric-line { transition: all 0.3s ease; opacity: 0.4; cursor: pointer; padding: 4px 0; }
+        .lyric-active { color: #00ff66; opacity: 1; font-weight: bold; transform: scale(1.05); text-shadow: 0 0 8px rgba(0,255,102,0.5); }
+        .song-item { transition: all 0.2s; cursor: pointer; }
+        .song-item:hover { background: rgba(255,255,255,0.15); transform: translateX(5px); }
+        .song-active { border-left: 4px solid #00ff66; background: rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6 h-[85vh]">
+        
+        <div class="glass-box rounded-2xl flex flex-col overflow-hidden h-full">
+            <div class="p-4 bg-black/20 border-b border-white/10">
+                <h2 class="font-bold text-lg tracking-wide text-blue-400">📚 THƯ VIỆN NHẠC</h2>
+            </div>
+            <div id="playlist" class="playlist-container flex-grow p-2 space-y-2">
+                <p class="text-center text-sm text-gray-400 mt-10">Đang quét kho nhạc...</p>
+            </div>
+        </div>
+
+        <div class="lg:col-span-3 glass-box rounded-2xl p-6 flex flex-col relative h-full">
+            <div id="bgBlur" class="absolute inset-0 bg-cover bg-center opacity-20 filter blur-2xl z-0 transition-all duration-1000"></div>
+
+            <div class="relative z-10 flex flex-col h-full gap-6">
+                <div class="flex items-center gap-6">
+                    <img id="coverImg" src="https://via.placeholder.com/150/111/444?text=Chưa+Chọn" class="w-32 h-32 rounded-xl shadow-2xl object-cover border border-white/20 transition-transform hover:scale-105">
+                    <div>
+                        <h1 id="nowPlayingTitle" class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-blue-500">Chưa chọn bài hát</h1>
+                        <p class="text-gray-300 mt-2">Dự án Ubuntu Backend Core</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/10">
+                        <p class="text-xs text-blue-400 font-bold mb-2 uppercase">Bản Full (2.mp3)</p>
+                        <audio id="fullAudio" controls class="w-full h-10 outline-none"></audio>
+                    </div>
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/10">
+                        <p class="text-xs text-purple-400 font-bold mb-2 uppercase">Bản Beat (3.mp3)</p>
+                        <audio id="beatAudio" controls class="w-full h-10 outline-none"></audio>
+                    </div>
+                </div>
+
+                <div class="flex-grow bg-black/20 rounded-xl p-4 border border-white/5 flex flex-col overflow-hidden relative">
+                    <video id="musicVideo" class="absolute inset-0 w-full h-full object-cover opacity-10 hidden" loop muted playsinline></video>
+                    
+                    <div id="lyricsBox" class="lyrics-container flex-grow text-center text-xl space-y-4 py-10 relative z-10">
+                        <p class="text-gray-500 text-base mt-20">Hãy chọn một bài hát từ danh sách để bắt đầu</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let parsedLyrics = [];
+
+        // 1. TỰ ĐỘNG KHỞI CHẠY KHI MỞ TRANG
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                // Gọi API lấy danh sách bài hát
+                const res = await fetch('/api/music/list');
+                const data = await res.json();
+                
+                const playlistEl = document.getElementById('playlist');
+                playlistEl.innerHTML = ''; // Xóa chữ loading
+
+                if (data.status === 'success' && data.songs.length > 0) {
+                    data.songs.forEach(song => {
+                        // Tạo khối HTML cho từng bài hát
+                        const div = document.createElement('div');
+                        div.className = 'song-item flex items-center gap-3 p-3 rounded-xl';
+                        div.id = `song-${song.id}`;
+                        div.innerHTML = `
+                            <img src="${song.cover_api}?t=${Date.now()}" class="w-12 h-12 rounded-md object-cover bg-gray-800" onerror="this.src='https://via.placeholder.com/50/222/555?text=Nhạc'">
+                            <div class="flex-grow overflow-hidden">
+                                <p class="font-bold text-sm truncate text-white">${song.title}</p>
+                                <p class="text-xs text-gray-400">High Quality Audio</p>
+                            </div>
+                        `;
+                        
+                        // Sự kiện khi bấm vào bài hát
+                        div.onclick = () => loadSong(song.id, song.title, song.cover_api);
+                        playlistEl.appendChild(div);
+                    });
+                } else {
+                    playlistEl.innerHTML = '<p class="text-center text-sm text-gray-400 mt-10">Kho nhạc đang trống.</p>';
+                }
+            } catch (err) {
+                console.error("Lỗi tải danh sách:", err);
+            }
+        });
+
+        // 2. HÀM TẢI VÀ PHÁT BÀI HÁT
+        async function loadSong(folderId, title, coverApi) {
+            // Đổi màu bài đang chọn
+            document.querySelectorAll('.song-active').forEach(el => el.classList.remove('song-active'));
+            document.getElementById(`song-${folderId}`).classList.add('song-active');
+
+            // Cập nhật Giao diện
+            document.getElementById('nowPlayingTitle').innerText = title;
+            const freshCover = `${coverApi}?t=${Date.now()}`;
+            document.getElementById('coverImg').src = freshCover;
+            document.getElementById('bgBlur').style.backgroundImage = `url('${freshCover}')`;
+
+            // Nạp API Âm thanh & Video
+            const mainAudio = document.getElementById('fullAudio');
+            const beatAudio = document.getElementById('beatAudio');
+            const videoEl = document.getElementById('musicVideo');
+            
+            mainAudio.src = `/api/music/stream/${folderId}/2.mp3`;
+            beatAudio.src = `/api/music/stream/${folderId}/3.mp3`;
+            videoEl.src = `/api/music/stream/${folderId}/4.mp4`;
+
+            // Xử lý Lời bài hát
+            try {
+                const res = await fetch(`/api/music/lyrics/${folderId}`);
+                const data = await res.json();
+                const lyricsBox = document.getElementById('lyricsBox');
+                lyricsBox.innerHTML = '';
+
+                if (data.status === 'success' && data.lyrics.length > 0) {
+                    parsedLyrics = data.lyrics;
+                    parsedLyrics.forEach((line, index) => {
+                        const p = document.createElement('p');
+                        p.className = 'lyric-line';
+                        p.id = `lyric-${index}`;
+                        p.innerText = line.text;
+                        p.onclick = () => { mainAudio.currentTime = line.time / 1000; mainAudio.play(); };
+                        lyricsBox.appendChild(p);
+                    });
+                } else {
+                    lyricsBox.innerHTML = '<p class="text-gray-500 text-sm mt-20">Không tìm thấy file lời bài hát đồng bộ.</p>';
+                    parsedLyrics = [];
+                }
+            } catch (err) { console.error("Lỗi tải lời:", err); }
+
+            // Tự động Play sau khi load xong
+            mainAudio.play().catch(e => console.log("Trình duyệt chặn Autoplay:", e));
+        }
+
+        // 3. ĐỒNG BỘ LỜI BÀI HÁT THEO THỜI GIAN THỰC
+        const mainPlayer = document.getElementById('fullAudio');
+        const vidPlayer = document.getElementById('musicVideo');
+
+        // Bật video nền chạy chìm mờ ảo khi nhạc play
+        mainPlayer.addEventListener('play', () => { vidPlayer.classList.remove('hidden'); vidPlayer.play(); });
+        mainPlayer.addEventListener('pause', () => vidPlayer.pause());
+        mainPlayer.addEventListener('seeked', () => vidPlayer.currentTime = mainPlayer.currentTime);
+
+        mainPlayer.addEventListener('timeupdate', () => {
+            if (parsedLyrics.length === 0) return;
+            const currentTimeMs = mainPlayer.currentTime * 1000;
+            
+            let activeIndex = -1;
+            for (let i = 0; i < parsedLyrics.length; i++) {
+                if (currentTimeMs >= parsedLyrics[i].time) activeIndex = i;
+                else break;
+            }
+
+            if (activeIndex !== -1) {
+                const currentActive = document.querySelector('.lyric-active');
+                const targetActive = document.getElementById(`lyric-${activeIndex}`);
+                
+                if (currentActive !== targetActive) {
+                    if (currentActive) currentActive.classList.remove('lyric-active');
+                    if (targetActive) {
+                        targetActive.classList.add('lyric-active');
+                        // Tự động cuộn lời bài hát cho nó vào chính giữa khung hình
+                        targetActive.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

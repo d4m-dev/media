@@ -12,7 +12,7 @@ from core.config import settings
 from core.database import init_db, db_manager
 from core.scheduler import ai_janitor_task
 
-from api import dashboard, websockets, chatbox, social, auth, widgets, projects, ai_admin, audio_engine
+from api import dashboard, websockets, chatbox, social, auth, widgets, projects, ai_admin, audio_engine, bio_premium, music_hub
 
 from middlewares.logger_tracker import LoggerTrackerMiddleware
 from middlewares.rate_limit import RateLimitMiddleware
@@ -79,6 +79,8 @@ app.include_router(widgets.router)
 app.include_router(projects.router)    
 app.include_router(ai_admin.router)    
 app.include_router(audio_engine.router)
+app.include_router(bio_premium.router)
+app.include_router(music_hub.router)
 
 # ==========================================
 # 🚀 TỰ ĐỘNG NHẬN DIỆN ĐƯỜNG DẪN GỐC (DYNAMIC PATH)
@@ -126,3 +128,19 @@ async def serve_audio_test():
     if os.path.exists(audio_path):
         return FileResponse(audio_path)
     return {"status": "error", "message": "Không tìm thấy audio-test.html"}
+
+@app.get("/numerology.html")
+async def serve_numerology():
+    """Trang Tra cứu Thần Số Học Premium"""
+    numerology_path = os.path.join(PUBLIC_DIR, "numerology.html")
+    if os.path.exists(numerology_path):
+        return FileResponse(numerology_path)
+    return {"status": "error", "message": "Không tìm thấy numerology.html"}
+
+@app.get("/music-test.html")
+async def serve_music_test():
+    """Trang Test Giao diện Music Player"""
+    music_test_path = os.path.join(PUBLIC_DIR, "music-test.html")
+    if os.path.exists(music_test_path):
+        return FileResponse(music_test_path)
+    return {"status": "error", "message": "Không tìm thấy music-test.html"}
