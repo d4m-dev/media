@@ -38,7 +38,7 @@ class DynamicHostingMiddleware:
         if os.path.isdir(project_path):
             if os.path.exists(os.path.join(project_path, ".frozen")):
                 # ==========================================
-                # GIAO DIỆN GLASSMORPHISM BẢO TRÍ PREMIUM
+                # GIAO DIỆN GLASSMORPHISM BẢO TRÌ PREMIUM
                 # ==========================================
                 html_content = f"""
                 <!DOCTYPE html>

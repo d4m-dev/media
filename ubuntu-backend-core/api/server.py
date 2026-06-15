@@ -13,7 +13,7 @@ from core.config import settings
 from core.database import init_db, db_manager
 from core.scheduler import ai_janitor_task
 
-from api import dashboard, websockets, chatbox, social, auth, widgets, projects, ai_admin, audio_engine, bio_premium, music_hub, telegram_bot, astrology
+from api import dashboard, websockets, chatbox, social, auth, widgets, projects, ai_admin, audio_engine, bio_premium, music_hub, telegram_bot, astrology, ytdl
 
 from middlewares.logger_tracker import LoggerTrackerMiddleware
 from middlewares.rate_limit import RateLimitMiddleware
@@ -81,6 +81,7 @@ app.include_router(bio_premium.router)
 app.include_router(music_hub.router)
 app.include_router(telegram_bot.router)
 app.include_router(astrology.router)
+app.include_router(ytdl.router)
 
 # ==========================================
 # 🚀 TỰ ĐỘNG NHẬN DIỆN ĐƯỜNG DẪN GỐC
@@ -161,3 +162,9 @@ async def serve_documentation():
     music_pro_path = os.path.join(PUBLIC_DIR, "documentation.html")
     if os.path.exists(music_pro_path): return FileResponse(music_pro_path)
     return {"status": "error", "message": "Không tìm thấy documentation.html"}
+
+@app.get("/yt-downloader.html")
+async def serve_yt_downloader():
+    html_path = os.path.join(PUBLIC_DIR, "yt-downloader.html")
+    if os.path.exists(html_path): return FileResponse(html_path)
+    return {"status": "error", "message": "Không tìm thấy yt-downloader.html"}

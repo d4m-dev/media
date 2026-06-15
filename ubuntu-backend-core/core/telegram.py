@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import re
+import time
 from datetime import datetime
 from core.config import settings
 
@@ -90,20 +91,18 @@ async def send_telegram_menu():
     )
 
 # ------------------------------------------------------------
-# LUỒNG XỬ LÝ ÂM THANH NGẦM (🚀 VÁ LỖI RESULT Ở ĐÂY)
+# LUỒNG XỬ LÝ ÂM THANH NGẦM 
 # ------------------------------------------------------------
 async def trigger_audio_processing(chat_id: str, file_id: str, chosen_name: str, original_filename: str, option: str):
     await send_telegram_message(f"📥 <b>Đang nạp file vào hệ sinh thái riêng:</b> <code>{chosen_name}</code>...")
     
     try:
-        # 🚀 Tăng timeout lên 60s để đề phòng mạng yếu
         async with httpx.AsyncClient(timeout=60.0) as client:
             file_res = await client.get(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getFile?file_id={file_id}")
             resp_data = file_res.json()
             
-            # 🚀 KIỂM TRA LỖI API: Nếu Telegram từ chối (Vd: File > 20MB)
             if not resp_data.get("ok"):
-                error_desc = resp_data.get("description", "Lỗi không xác định")
+                error_desc = resp_data.get("description", "Không rõ nguyên nhân")
                 raise Exception(f"Telegram API từ chối tải file: {error_desc}")
                 
             tg_file_path = resp_data["result"]["file_path"]
@@ -122,11 +121,10 @@ async def trigger_audio_processing(chat_id: str, file_id: str, chosen_name: str,
             os.makedirs(project_dir, exist_ok=True)
             
             saved_input_path = os.path.join(project_dir, f"{task_id}{ext}")
-            
-            # Tải file về máy chủ
             file_data = await client.get(download_url)
+            
             if file_data.status_code != 200:
-                raise Exception(f"Mất kết nối tải file (Mã lỗi: {file_data.status_code})")
+                raise Exception(f"Mất kết nối tải file (HTTP {file_data.status_code})")
                 
             with open(saved_input_path, "wb") as f:
                 f.write(file_data.content)
@@ -149,10 +147,9 @@ async def trigger_audio_processing(chat_id: str, file_id: str, chosen_name: str,
                 f_path = os.path.join(project_dir, f_name)
                 if os.path.exists(f_path):
                     with open(f_path, "rb") as f:
-                        # 🚀 Tăng timeout trả file về lên 120s
                         await client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendDocument", data={"chat_id": chat_id}, files={"document": f}, timeout=120.0)
     except Exception as e:
-        await send_telegram_message(f"❌ Lỗi hạ tầng Audio: {str(e)}")
+        await send_telegram_message(f"❌ Lỗi hạ tầng Audio: {e}")
 
 # ------------------------------------------------------------
 # CORE: VÒNG LẶP LẮNG NGHE CHÍNH
@@ -162,6 +159,9 @@ async def telegram_polling_task():
     print(f"🤖 Trợ lý Telegram đã khởi động! Đang chờ lệnh từ Sếp...")
     update_id = 0
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getUpdates"
+    
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    RESTART_LOCK_FILE = os.path.join(BASE_DIR, ".restart_lock")
     
     async with httpx.AsyncClient(timeout=30.0) as client:
         while True:
@@ -224,7 +224,6 @@ async def telegram_polling_task():
                             
                             if chat_id == str(settings.TELEGRAM_CHAT_ID).strip():
                                 
-                                # NHẬN TÊN TỪ VĂN BẢN
                                 if chat_id in pending_audio_tasks and pending_audio_tasks[chat_id].get("step") == "name" and not text.startswith(">") and not re.search(r'^\/', text):
                                     pending_audio_tasks[chat_id]["chosen_name"] = text
                                     pending_audio_tasks[chat_id]["step"] = "option"
@@ -240,7 +239,6 @@ async def telegram_polling_task():
                                     await send_telegram_message(f"✅ Đã chốt tên: <b>{text}</b>\n\nSếp muốn trích xuất những file nào?", reply_markup=kb_options)
                                     continue
 
-                                # Lệnh Terminal Xuyên không
                                 if text.startswith(">"):
                                     cmd = text[1:].strip()
                                     await send_telegram_message(f"💻 Đang thực thi: <code>{cmd}</code>")
@@ -257,7 +255,6 @@ async def telegram_polling_task():
                                 elif text in ["/start", "/menu", "menu"]:
                                     await send_telegram_menu()
                                     
-                                # Lệnh gõ tắt kiểm tra RAM/CPU
                                 elif text in ["/ram", "/hw"]:
                                     await send_telegram_message("⏳ Đang quét thông số phần cứng...")
                                     try:
@@ -273,16 +270,33 @@ async def telegram_polling_task():
                                     except Exception as e:
                                         await send_telegram_message(f"❌ Lỗi khi đọc phần cứng: {str(e)}")
                                 
-                                # Lệnh Khởi động lại Server an toàn
+                                # 🚀 LỆNH RESTART TÍCH HỢP KHÓA 2 PHÚT VÀ XÓA HÀNG ĐỢI
                                 elif text == "/restart":
+                                    current_time = time.time()
+                                    if os.path.exists(RESTART_LOCK_FILE):
+                                        try:
+                                            with open(RESTART_LOCK_FILE, "r") as f:
+                                                last_time = float(f.read().strip())
+                                                if current_time - last_time < 120:
+                                                    await send_telegram_message("⏳ Hệ thống vừa khởi động lại. Sếp vui lòng đợi 2 phút để hạ nhiệt trước khi khởi động lại lần nữa!")
+                                                    continue
+                                        except: pass
+                                    
+                                    # Ghi đè thời gian hiện tại
+                                    with open(RESTART_LOCK_FILE, "w") as f:
+                                        f.write(str(current_time))
+                                        
                                     await send_telegram_message("🔄 Nhận lệnh! Đang tiến hành dọn dẹp và restart hệ thống...")
+                                    
                                     try:
+                                        # ÉP API XÓA LỆNH /restart TRONG HÀNG ĐỢI TRƯỚC KHI TẮT ĐIỆN
+                                        await client.get(url, params={"offset": update_id, "timeout": 2})
+                                        
                                         import sys
                                         os.execl(sys.executable, sys.executable, *sys.argv)
                                     except Exception as e:
                                         await send_telegram_message(f"❌ Không thể restart: {str(e)}")
                                         
-                                # Lệnh Thời Tiết
                                 elif text.startswith("/weather") or text.startswith("/wether") or text.startswith("/thoitiet"):
                                     parts = text.split(maxsplit=1)
                                     city = parts[1] if len(parts) > 1 else "Phu Quoc"
@@ -306,7 +320,7 @@ async def telegram_polling_task():
                                     except Exception as e:
                                         await send_telegram_message(f"❌ Lỗi vệ tinh thời tiết: {str(e)}")
                                         
-                                # 🚀 BỘ NÃO DJ PHÁT NHẠC (NÂNG CẤP SIÊU REGEX)
+                                # 🚀 BỘ NÃO DJ PHÁT NHẠC
                                 elif re.search(r'^(bật|phát|nghe|mở|tìm|cho\s+sếp)\b', text.lower()):
                                     text_lower = text.lower()
                                     await send_telegram_message("🔎 <b>Đang phân tích yêu cầu âm nhạc của Sếp...</b>")
@@ -314,17 +328,11 @@ async def telegram_polling_task():
                                     is_video = bool(re.search(r'\b(video|mv|mp4)\b', text_lower))
                                     is_beat = bool(re.search(r'\b(beat|karaoke|nhạc nền|không lời)\b', text_lower))
                                     
-                                    # MÁY SẤY TỪ KHÓA: Bóc từng lớp vỏ câu lệnh
                                     song_name = text_lower
-                                    
-                                    # 1. Bóc lớp vỏ lệnh (bật, phát, cho sếp...)
                                     song_name = re.sub(r'^(bật|phát|nghe|mở|tìm|cho\s+sếp|cho\s+xin|xin)\s+', '', song_name).strip()
-                                    
-                                    # 2. Bóc lớp vỏ bổ trợ (cái, bài hát, nhạc beat...) lặp lại 3 lần để sạch bách
                                     for _ in range(3):
                                         song_name = re.sub(r'^(cái|bản|nhạc|bài\s+hát|bài|video|mv|beat|karaoke|nhạc\s+nền|của)\s+', '', song_name).strip()
                                         
-                                    # 3. Chặt cái đuôi cảm thán (đi em, nhé sếp...)
                                     song_name = re.sub(r'\s+(nhé|nha|đi\s+em|đi|nữa|giúp\s+sếp|với)$', '', song_name).strip()
                                     
                                     if not song_name:
@@ -341,7 +349,6 @@ async def telegram_polling_task():
                                                 found_folder = folder
                                                 break
                                     
-                                    # NẾU TÌM THẤY TRONG MÁY CHỦ
                                     if found_folder:
                                         folder_path = os.path.join(MUSIC_DIR, found_folder)
                                         target_file = "4.mp4" if is_video else ("3.mp3" if is_beat else "2.mp3")
@@ -363,7 +370,6 @@ async def telegram_polling_task():
                                                 await send_telegram_message(f"❌ Lỗi gửi file nội bộ: {e}")
                                             continue 
                                             
-                                    # NẾU KHÔNG CÓ -> TẢI BẰNG PYTHON TRONG MYENV
                                     await send_telegram_message(f"🌐 Không có sẵn bài <b>{song_name.title()}</b> trong Server.\n🛸 <i>Đang kích hoạt yt-dlp thăm dò trên Internet...</i>")
                                     
                                     try:
@@ -379,7 +385,6 @@ async def telegram_polling_task():
                                         python_exec = os.path.expanduser("~/myenv/bin/python3")
                                         yt_dlp_base = f'"{python_exec}" -m yt_dlp'
                                         
-                                        # 🚀 FIX LỖI VIDEO CÂM: ÉP YT-DLP TẢI ĐỊNH DẠNG MP4 ĐÃ GỘP SẴN ÂM THANH
                                         if is_video:
                                             cmd = f'{yt_dlp_base} -f "best[ext=mp4]/best" "ytsearch1:{song_name} official mv" -o "{out_tmpl}" --max-filesize 45M'
                                             send_method = "sendVideo"
@@ -401,9 +406,9 @@ async def telegram_polling_task():
                                         if downloaded_file:
                                             await send_telegram_message(f"✅ Đã tải xong bài <b>{song_name.title()}</b>! Đang gửi cho Sếp...")
                                             async with httpx.AsyncClient() as dl_client:
-                                                with open(downloaded_file, "rb") as f:
+                                                with open(os.path.join(TEMP_DL_DIR, downloaded_file), "rb") as f:
                                                     await dl_client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{send_method}", data={"chat_id": chat_id}, files={file_key: f}, timeout=120.0)
-                                            os.remove(downloaded_file)
+                                            os.remove(os.path.join(TEMP_DL_DIR, downloaded_file))
                                         else:
                                             err_msg = result.stderr if result.stderr else "Quá dung lượng 45MB của Telegram hoặc không tìm thấy bài hát."
                                             await send_telegram_message(f"❌ <b>Báo cáo lỗi yt-dlp:</b>\n<pre>{err_msg[:500]}</pre>")
@@ -536,8 +541,31 @@ async def telegram_polling_task():
                                     except Exception as e:
                                         await send_telegram_message(f"❌ Lỗi sao lưu: {e}")
                                     
+                                # 🚀 NÚT BẤM CŨNG ĐƯỢC TÍCH HỢP KHÓA 2 PHÚT
                                 elif data_cb == "restart_api":
-                                    await send_telegram_message("🔄 Đã làm mới hệ thống thành công trên cổng 16868!")
+                                    current_time = time.time()
+                                    if os.path.exists(RESTART_LOCK_FILE):
+                                        try:
+                                            with open(RESTART_LOCK_FILE, "r") as f:
+                                                last_time = float(f.read().strip())
+                                                if current_time - last_time < 120:
+                                                    await send_telegram_message("⏳ Hệ thống vừa khởi động lại. Sếp vui lòng đợi 2 phút để hạ nhiệt!")
+                                                    await client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                                                    continue
+                                        except: pass
+                                    
+                                    with open(RESTART_LOCK_FILE, "w") as f:
+                                        f.write(str(current_time))
+                                        
+                                    await send_telegram_message("🔄 Nhận lệnh! Đang tiến hành làm mới hệ thống...")
+                                    await client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                                    
+                                    try:
+                                        await client.get(url, params={"offset": update_id, "timeout": 2})
+                                        import sys
+                                        os.execl(sys.executable, sys.executable, *sys.argv)
+                                    except Exception as e:
+                                        await send_telegram_message(f"❌ Không thể restart: {str(e)}")
                                 
                                 await client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": cb_id})
                                 
