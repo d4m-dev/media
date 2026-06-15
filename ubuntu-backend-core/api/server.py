@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Ubuntu Backend Core", version="1.0.0", lifespan=lifespan)
 
 # ==========================================
-# 🔮 LỚP GÁC CỔNG: TỰ ĐỘNG TIÊM BRANDING D4M-DEV
+# 🔮 LỚP GÁC CỔNG: TIÊM BỘ NHẬN DIỆN HỆ THỐNG NỘI BỘ
 # ==========================================
 class AutoBrandingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -45,9 +45,19 @@ class AutoBrandingMiddleware(BaseHTTPMiddleware):
             body_chunks = [chunk async for chunk in response.body_iterator]
             html_body = b"".join(body_chunks).decode("utf-8")
             
-            if "</body>" in html_body:
-                injection = '<script src="/scripts/d4m-branding.js"></script>\n</body>'
-                html_body = html_body.replace("</body>", injection)
+            # 🖥️ Vì các dự án hosted đã được tách xử lý, luồng này chỉ phục vụ Ubuntu-backend hệ thống
+            ubuntu_branding_injection = '''
+    <link rel="icon" type="image/x-icon" href="/src/favicon/ubuntu-backend/favicon.ico?v=1">
+    <link rel="icon" type="image/png" sizes="96x96" href="/src/favicon/ubuntu-backend/favicon-96x96.png?v=1">
+    <link rel="icon" type="image/svg+xml" href="/src/favicon/ubuntu-backend/favicon.svg?v=1">
+    <link rel="apple-touch-icon" sizes="180x180" href="/src/favicon/ubuntu-backend/apple-touch-icon.png?v=1">
+    <link rel="manifest" href="/src/favicon/ubuntu-backend/site.webmanifest?v=1">
+</head>'''
+
+            if "</head>" in html_body:
+                html_body = html_body.replace("</head>", ubuntu_branding_injection)
+            elif "<body" in html_body:
+                html_body = html_body.replace("<body", f"<head>{ubuntu_branding_injection}\n</head>\n<body")
             
             headers = dict(response.headers)
             headers["content-length"] = str(len(html_body.encode("utf-8")))
@@ -84,12 +94,17 @@ app.include_router(astrology.router)
 app.include_router(ytdl.router)
 
 # ==========================================
-# 🚀 TỰ ĐỘNG NHẬN DIỆN ĐƯỜNG DẪN GỐC
+# 🚀 TỰ ĐỘNG NHẬN DIỆN ĐƯỜNG DẪN GỐC & TÀI NGUYÊN TĨNH
 # ==========================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 AUDIO_OUTPUT_DIR = os.path.join(BASE_DIR, "audio_workspace", "outputs")
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
+
+# MỞ TOANG CỬA THƯ MỤC /src ĐỂ TRÌNH DUYỆT TỰ DO KÉO FAVICON & MANIFEST
+SRC_DIR = os.path.join(BASE_DIR, "src")
+os.makedirs(SRC_DIR, exist_ok=True)
+app.mount("/src", StaticFiles(directory=SRC_DIR), name="src")
 
 os.makedirs(os.path.join(PUBLIC_DIR, "js"), exist_ok=True)
 app.mount("/js", StaticFiles(directory=os.path.join(PUBLIC_DIR, "js")), name="js")
@@ -151,10 +166,8 @@ async def serve_music_pro():
 
 @app.get("/social-hub.html")
 async def serve_social_hub():
-    """Trang Bảng tin Mạng Xã Hội Đa Phương Tiện"""
     social_path = os.path.join(PUBLIC_DIR, "social-hub.html")
-    if os.path.exists(social_path): 
-        return FileResponse(social_path)
+    if os.path.exists(social_path): return FileResponse(social_path)
     return {"status": "error", "message": "Không tìm thấy social-hub.html"}
 
 @app.get("/documentation.html")

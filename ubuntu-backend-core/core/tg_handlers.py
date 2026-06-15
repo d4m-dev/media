@@ -44,7 +44,7 @@ async def trigger_audio_processing(chat_id: str, file_id: str, chosen_name: str,
             if option in ["beat", "all"]: files_to_send.append(f"{task_id}_beat.mp3")
             if option in ["lyric", "all"]: files_to_send.append(f"{task_id}_lyrics.lrc")
             
-            await send_telegram_message(f"✅ <b>AI đã xong:</b> Đang gửi {clean_name} cho sếp...")
+            await send_telegram_message(f"✅ <b>AI đã xong:</b> Đang gửi {clean_name}...")
             for f_name in files_to_send:
                 f_path = os.path.join(project_dir, f_name)
                 if os.path.exists(f_path):
@@ -59,7 +59,7 @@ async def trigger_ytdl_download(chat_id: str, task_info: dict, quality: str):
     fmt = task_info["format"]
     title = task_info["title"]
     
-    await send_telegram_message(f"🚀 <b>Đang kéo dữ liệu:</b> <code>{title}</code>\n⏳ Dùng 5 luồng tải siêu tốc...")
+    await send_telegram_message(f"🚀 <b>Đang kéo dữ liệu:</b> <code>{title}</code>\n⏳ Khởi động động cơ 5 luồng siêu tốc...")
     try:
         safe_title = re.sub(r'[\\/*?:"<>|]', "", title).strip() or "Unknown_Video"
         from api.audio_engine import WORKSPACE_DIR
@@ -68,18 +68,19 @@ async def trigger_ytdl_download(chat_id: str, task_info: dict, quality: str):
         
         out_tmpl = os.path.join(task_dir, f"d4m-dev_{safe_title}.%(ext)s")
         python_exec = os.path.expanduser("~/myenv/bin/python3")
-        yt_dlp_base = f'"{python_exec}" -m yt_dlp --concurrent-fragments 5 --no-warnings'
+        
+        yt_dlp_base = f'"{python_exec}" -m yt_dlp --concurrent-fragments 5 --no-warnings --no-playlist'
         
         if fmt == "mp3":
             audio_q = "0" if quality == "320" else "5"
             cmd = f'{yt_dlp_base} -f "bestaudio/best" -x --audio-format mp3 --audio-quality {audio_q} -o "{out_tmpl}" "{url}"'
             send_method, file_key = "sendAudio", "audio"
         else:
-            cmd = f'{yt_dlp_base} -f "bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "{out_tmpl}" "{url}"'
+            cmd = f'{yt_dlp_base} -f "bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best" --merge-output-format mp4 -o "{out_tmpl}" "{url}"'
             send_method, file_key = "sendVideo", "video"
             
         res = await asyncio.to_thread(subprocess.run, cmd, shell=True, capture_output=True, text=True)
-        if res.returncode != 0: raise Exception(res.stderr)
+        if res.returncode != 0: raise Exception(f"Lỗi tải yt-dlp: {res.stderr}")
             
         downloaded_file = None
         for f in os.listdir(task_dir):
@@ -87,11 +88,47 @@ async def trigger_ytdl_download(chat_id: str, task_info: dict, quality: str):
                 downloaded_file = os.path.join(task_dir, f)
                 break
                 
-        if not downloaded_file: raise Exception("Tải xong nhưng mất file.")
+        if not downloaded_file: raise Exception("Tải xong nhưng mất file (Vui lòng kiểm tra ffmpeg).")
+        
+        # 🚀 CHỐT CHẶN CÂN FILE THỰC TẾ
+        file_size_mb = os.path.getsize(downloaded_file) / (1024 * 1024)
+        if file_size_mb > 49.5:
+            from urllib.parse import quote
+            tunnel_url = ""
+            try:
+                # Ép lấy link trực tiếp từ lõi hệ thống Tunnel
+                from scripts.network_tunnel import get_tunnel_url
+                tunnel_url = get_tunnel_url()
+            except: pass
             
-        await send_telegram_message(f"✅ <b>Đã lưu:</b> Đang bắn lên Telegram cho sếp...")
-        async with httpx.AsyncClient() as client:
+            base_url = tunnel_url if tunnel_url else "http://192.168.110.123:16868"
+            web_deep_link = f"{base_url}/yt-downloader.html?url={quote(url)}"
+            
+            kb = {"inline_keyboard": [[{"text": "🌐 Mở Web Tải Trực Tiếp", "url": web_deep_link}]]}
+            await send_telegram_message(
+                f"⚠️ <b>File đã tải xong nhưng nặng {file_size_mb:.1f} MB!</b>\n"
+                f"Giới hạn của Telegram API là 50MB nên Bot không thể gửi trực tiếp vào tin nhắn.\n\n"
+                f"Vui lòng nhấn nút bên dưới để lưu thẳng vào máy từ Server nhé:", 
+                reply_markup=kb
+            )
+            return
+            
+        await send_telegram_message(f"✅ <b>Đã lưu kho ({file_size_mb:.1f} MB):</b> Đang bắn lên Telegram...")
+        
+        async with httpx.AsyncClient(timeout=None) as client:
             with open(downloaded_file, "rb") as f:
-                await client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{send_method}", data={"chat_id": chat_id}, files={file_key: f}, timeout=300.0)
+                tg_res = await client.post(
+                    f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{send_method}", 
+                    data={"chat_id": chat_id}, 
+                    files={file_key: f}
+                )
+                if tg_res.status_code != 200:
+                    raise Exception(f"Telegram từ chối nhận file: {tg_res.text}")
+                    
     except Exception as e:
-        await send_telegram_message(f"❌ <b>Lỗi tải YouTube:</b> {e}")
+        err_msg = str(e)
+        if "ReadTimeout" in repr(e) or "Timeout" in repr(e): 
+            err_msg = "Mạng yếu, quá thời gian gửi file lên Telegram."
+        elif not err_msg: 
+            err_msg = repr(e)
+        await send_telegram_message(f"❌ <b>Lỗi tải YouTube:</b> {err_msg}")

@@ -25,7 +25,8 @@ class DynamicHostingMiddleware:
 
         if (path == "/" or path.startswith("/api/") or path.startswith("/ws/") or 
             path.startswith("/css/") or path.startswith("/js/") or path.startswith("/audio-files/") or 
-            path.startswith("/admin/") or path.endswith(".html")):
+            path.startswith("/admin/") or path.startswith("/branding-assets/") or path.startswith("/src/") or 
+            path.endswith(".html")):
             return await self.app(scope, receive, send)
 
         parts = [p for p in path.split("/") if p]
@@ -112,15 +113,42 @@ class DynamicHostingMiddleware:
             remaining_path = "/".join(parts[1:])
             file_target = os.path.join(project_path, remaining_path)
 
+            # Chuỗi mã định danh thương hiệu d4m-dev dành cho các ứng dụng hosted
+            d4m_branding_injection = '''
+    <link rel="icon" type="image/x-icon" href="/src/favicon/d4m-dev/favicon.ico?v=1">
+    <link rel="icon" type="image/png" sizes="96x96" href="/src/favicon/d4m-dev/favicon-96x96.png?v=1">
+    <link rel="icon" type="image/svg+xml" href="/src/favicon/d4m-dev/favicon.svg?v=1">
+    <link rel="apple-touch-icon" sizes="180x180" href="/src/favicon/d4m-dev/apple-touch-icon.png?v=1">
+    <link rel="manifest" href="/src/favicon/d4m-dev/site.webmanifest?v=1">
+</head>'''
+
+            # 🚀 LUỒNG XỬ LÝ 1: Gọi trực tiếp tệp HTML cụ thể
             if remaining_path and os.path.isfile(file_target) and not file_target.endswith('.py'):
-                response = FileResponse(file_target)
-                await response(scope, receive, send)
+                if file_target.endswith('.html'):
+                    with open(file_target, 'r', encoding='utf-8') as f:
+                        html_content = f.read()
+                    if "</head>" in html_content:
+                        html_content = html_content.replace("</head>", d4m_branding_injection)
+                    elif "<body" in html_content:
+                        html_content = html_content.replace("<body", f"<head>{d4m_branding_injection}\n</head>\n<body")
+                    response = HTMLResponse(content=html_content, status_code=200)
+                    await response(scope, receive, send)
+                else:
+                    response = FileResponse(file_target)
+                    await response(scope, receive, send)
                 return
 
+            # 🚀 LUỒNG XỬ LÝ 2: Gọi thư mục gốc (Tự động nạp index.html)
             index_html = os.path.join(project_path, 'index.html')
             if not remaining_path or remaining_path == 'index.html':
                 if os.path.exists(index_html):
-                    response = FileResponse(index_html)
+                    with open(index_html, 'r', encoding='utf-8') as f:
+                        html_content = f.read()
+                    if "</head>" in html_content:
+                        html_content = html_content.replace("</head>", d4m_branding_injection)
+                    elif "<body" in html_content:
+                        html_content = html_content.replace("<body", f"<head>{d4m_branding_injection}\n</head>\n<body")
+                    response = HTMLResponse(content=html_content, status_code=200)
                     await response(scope, receive, send)
                     return
                     

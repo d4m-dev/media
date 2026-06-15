@@ -8,19 +8,38 @@ import re
 import time
 import json
 import uuid
+from urllib.parse import quote
 from core.config import settings
 
-# 🚀 IMPORT CÁC MODULE VỪA CHIA TÁCH
+# Lấy đồ nghề từ các file vệ tinh
 from core.tg_utils import get_device_battery, create_backup_zip, send_telegram_message, send_telegram_menu
 from core.tg_handlers import trigger_audio_processing, trigger_ytdl_download
 
-# BỘ NHỚ LƯU TRỮ TRẠNG THÁI
+# 🚀 IMPORT BỘ LẬP LỊCH TÁC VỤ NGẦM
+from core.tg_scheduler import run_scheduler
+
+# BỘ NHỚ TRẠNG THÁI
 pending_audio_tasks = {}
 pending_ytdl_tasks = {}
 
+# 🚀 HÀM BỔ TRỢ: LẤY LINK WEB CHUẨN XÁC TỪ FILE LOG CLOUDFLARE
+def get_web_ui_url(yt_url):
+    tunnel_link = ""
+    try:
+        from scripts.network_tunnel import get_tunnel_url
+        tunnel_link = get_tunnel_url()
+    except: pass
+    
+    base_url = tunnel_link if tunnel_link else "http://192.168.110.123:16868"
+    return f"{base_url}/yt-downloader.html?url={quote(yt_url)}"
+
 async def telegram_polling_task():
     if not settings.TELEGRAM_BOT_TOKEN: return
-    print(f"🤖 Trợ lý Telegram đã khởi động! Đang chờ lệnh từ Sếp Lý Thừa Ân...")
+    print(f"🤖 Trợ lý Telegram đã khởi động! Đang chờ lệnh từ Sếp...")
+    
+    # Cắm điện cho trạm lập lịch
+    asyncio.create_task(run_scheduler())
+    
     update_id = 0
     url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getUpdates"
     
@@ -37,23 +56,16 @@ async def telegram_polling_task():
                         update_id = update["update_id"] + 1
                         
                         # ==========================================
-                        # 1. TIẾP NHẬN FILE (BƯỚC 1: HỎI TÊN)
+                        # 1. TIẾP NHẬN FILE TỪ MÁY
                         # ==========================================
                         if "message" in update and str(update["message"]["chat"]["id"]) == str(settings.TELEGRAM_CHAT_ID):
                             msg = update["message"]
                             chat_id = str(msg["chat"]["id"])
-                            file_id = None
-                            file_name = "telegram_audio.mp3"
+                            file_id, file_name = None, "telegram_audio.mp3"
                             
-                            if "audio" in msg:
-                                file_id = msg["audio"]["file_id"]
-                                file_name = msg["audio"].get("file_name", file_name)
-                            elif "document" in msg:
-                                file_id = msg["document"]["file_id"]
-                                file_name = msg["document"].get("file_name", file_name)
-                            elif "video" in msg:
-                                file_id = msg["video"]["file_id"]
-                                file_name = msg["video"].get("file_name", "telegram_video.mp4")
+                            if "audio" in msg: file_id, file_name = msg["audio"]["file_id"], msg["audio"].get("file_name", file_name)
+                            elif "document" in msg: file_id, file_name = msg["document"]["file_id"], msg["document"].get("file_name", file_name)
+                            elif "video" in msg: file_id, file_name = msg["video"]["file_id"], msg["video"].get("file_name", "telegram_video.mp4")
                                 
                             if file_id:
                                 custom_caption = msg.get("caption", "").strip()
@@ -66,11 +78,11 @@ async def telegram_polling_task():
                                     [{"text": f"✅ Dùng tên: {suggested_name}", "callback_data": "confirm_audio_name"}],
                                     [{"text": "❌ Hủy bỏ", "callback_data": "cancel_audio_name"}]
                                 ]}
-                                await send_telegram_message("📥 <b>Bot đã nhận tệp!</b>\n\nSếp muốn đặt tên dự án là gì?\n✏️ Gõ tin nhắn để <b>nhập tên mới</b>\nHoặc bấm nút để <b>dùng tên mặc định</b>:", reply_markup=keyboard)
+                                await send_telegram_message("📥 <b>Bot đã nhận tệp!</b>\n\nSếp muốn đặt tên dự án là gì?\n✏️ Gõ tin nhắn để nhập tên mới:", reply_markup=keyboard)
                                 continue
 
                         # ==========================================
-                        # 2. XỬ LÝ LỆNH VĂN BẢN VÀ TERMINAL
+                        # 2. XỬ LÝ LỆNH VĂN BẢN (TEXT/LINKS)
                         # ==========================================
                         if "message" in update and "text" in update["message"]:
                             text = update["message"]["text"].strip()
@@ -78,7 +90,7 @@ async def telegram_polling_task():
                             
                             if chat_id == str(settings.TELEGRAM_CHAT_ID).strip():
                                 
-                                # A. NHẬN TÊN DỰ ÁN AUDIO
+                                # A. Đặt tên Dự án Audio
                                 if chat_id in pending_audio_tasks and pending_audio_tasks[chat_id].get("step") == "name" and not text.startswith(">") and not re.search(r'^\/', text):
                                     pending_audio_tasks[chat_id]["chosen_name"] = text
                                     pending_audio_tasks[chat_id]["step"] = "option"
@@ -88,23 +100,24 @@ async def telegram_polling_task():
                                         [{"text": "🌟 Xử lý TẤT CẢ", "callback_data": "extract_all"}],
                                         [{"text": "❌ Hủy bỏ", "callback_data": "cancel_audio_name"}]
                                     ]}
-                                    await send_telegram_message(f"✅ Đã chốt tên: <b>{text}</b>\n\nSếp muốn trích xuất những file nào?", reply_markup=kb_options)
+                                    await send_telegram_message(f"✅ Đã chốt tên: <b>{text}</b>\nChọn chức năng:", reply_markup=kb_options)
                                     continue
                                 
-                                # B. BỘ NHẬN DIỆN LINK YOUTUBE THÔNG MINH
-                                yt_match = re.search(r'(?:tải|tai|download)?\s*(mp3|mp4|video|audio)?\s*(https?://(?:www\.)?(?:youtube\.com|youtu\.be)[^\s]+)', text.lower())
+                                # B. 🚀 YOUTUBE PRO: TÍCH HỢP BỘ LỌC 50MB VÀ DEEP LINK WEB
+                                yt_match = re.search(r'(?:tải|tai|download)?\s*(mp3|mp4|video|audio)?\s*(https?://(?:www\.)?(?:youtube\.com|youtu\.be)[^\s]+)', text, re.IGNORECASE)
                                 if yt_match:
-                                    fmt_str = yt_match.group(1)
+                                    fmt_str = yt_match.group(1).lower() if yt_match.group(1) else None
                                     yt_url = yt_match.group(2)
                                     req_fmt = 'mp3' if fmt_str in ['mp3', 'audio'] else 'mp4' if fmt_str in ['mp4', 'video'] else None
                                     
-                                    await send_telegram_message("⏳ <b>Đang phân tích Link YouTube...</b>")
+                                    await send_telegram_message("⏳ <b>Đang quét vệ tinh YouTube...</b>")
                                     try:
                                         python_exec = os.path.expanduser("~/myenv/bin/python3")
                                         cmd = f'"{python_exec}" -m yt_dlp --dump-json --no-warnings --no-playlist "{yt_url}"'
                                         res_cmd = await asyncio.to_thread(subprocess.run, cmd, shell=True, capture_output=True, text=True)
                                         
-                                        if res_cmd.returncode != 0: raise Exception("Không thể phân tích video này.")
+                                        if res_cmd.returncode != 0: raise Exception(f"Không thể phân tích video này.\nChi tiết: {res_cmd.stderr[:200]}")
+                                        
                                         info = json.loads(res_cmd.stdout)
                                         duration = info.get("duration", 0)
                                         
@@ -129,6 +142,9 @@ async def telegram_polling_task():
                                         task_id = str(uuid.uuid4())[:8]
                                         safe_title = info.get("title", "YouTube Video")
                                         
+                                        # 🚀 Tự động lấy Link Web UI chuẩn xác
+                                        web_deep_link = get_web_ui_url(yt_url)
+                                        
                                         pending_ytdl_tasks[chat_id] = {
                                             "task_id": task_id, "url": yt_url, "title": safe_title,
                                             "video_sizes": video_sizes, "audio_320": audio_320_size,
@@ -137,55 +153,63 @@ async def telegram_polling_task():
                                         
                                         if req_fmt == "mp4":
                                             kb = {"inline_keyboard": []}
+                                            has_large_files = False
                                             for h in sorted(video_sizes.keys(), reverse=True):
                                                 sz = video_sizes[h]
-                                                btn_text = f"🎬 {h}p • {sz} MB" if sz > 0 else f"🎬 {h}p"
-                                                kb["inline_keyboard"].append([{"text": btn_text, "callback_data": f"ytdl_dl_{task_id}_{h}"}])
-                                            await send_telegram_message(f"🎬 <b>{safe_title}</b>\n\nSếp chọn độ phân giải MP4 nhé:", reply_markup=kb)
+                                                if sz <= 49.5:
+                                                    btn_text = f"🎬 {h}p • {sz} MB" if sz > 0 else f"🎬 {h}p"
+                                                    kb["inline_keyboard"].append([{"text": btn_text, "callback_data": f"ytdl_dl_{task_id}_{h}"}])
+                                                else: has_large_files = True
+                                            if has_large_files:
+                                                kb["inline_keyboard"].append([{"text": "🌐 Tải chất lượng cao (>50MB)", "url": web_deep_link}])
+                                                
+                                            await send_telegram_message(f"🎬 <b>{safe_title}</b>\nSếp chọn độ phân giải MP4:", reply_markup=kb)
+                                            
                                         elif req_fmt == "mp3":
-                                            kb = {"inline_keyboard": [
-                                                [{"text": f"🎧 320kbps Lossless • {audio_320_size} MB", "callback_data": f"ytdl_dl_{task_id}_320"}],
-                                                [{"text": f"🎵 128kbps Standard • {audio_128_size} MB", "callback_data": f"ytdl_dl_{task_id}_128"}]
-                                            ]}
-                                            await send_telegram_message(f"🎧 <b>{safe_title}</b>\n\nSếp chọn chất lượng MP3 nhé:", reply_markup=kb)
+                                            kb = {"inline_keyboard": []}
+                                            has_large_mp3 = False
+                                            if audio_320_size <= 49.5: kb["inline_keyboard"].append([{"text": f"🎧 320kbps • {audio_320_size} MB", "callback_data": f"ytdl_dl_{task_id}_320"}])
+                                            else: has_large_mp3 = True
+                                            
+                                            if audio_128_size <= 49.5: kb["inline_keyboard"].append([{"text": f"🎵 128kbps • {audio_128_size} MB", "callback_data": f"ytdl_dl_{task_id}_128"}])
+                                            else: has_large_mp3 = True
+                                            
+                                            if has_large_mp3: kb["inline_keyboard"].append([{"text": "🌐 Tải Âm thanh quá lớn (>50MB)", "url": web_deep_link}])
+                                            await send_telegram_message(f"🎧 <b>{safe_title}</b>\nSếp chọn chất lượng MP3:", reply_markup=kb)
+                                            
                                         else:
                                             kb = {"inline_keyboard": [
                                                 [{"text": "🎬 Tải Video (MP4)", "callback_data": f"ytdl_fmt_{task_id}_mp4"}],
                                                 [{"text": "🎧 Tải Âm thanh (MP3)", "callback_data": f"ytdl_fmt_{task_id}_mp3"}]
                                             ]}
-                                            await send_telegram_message(f"🎥 <b>{safe_title}</b>\n\nSếp muốn tải Video hay Âm thanh?", reply_markup=kb)
+                                            await send_telegram_message(f"🎥 <b>{safe_title}</b>\nSếp muốn tải định dạng nào?", reply_markup=kb)
                                     except Exception as e: await send_telegram_message(f"❌ Lỗi YouTube: {e}")
                                     continue
                                 
-                                # C. Terminal & Menu
+                                # C. Terminal & Menu Khác
                                 if text.startswith(">"):
                                     try:
                                         result = await asyncio.to_thread(subprocess.run, text[1:].strip(), shell=True, capture_output=True, text=True, timeout=15)
                                         output = result.stdout or result.stderr or "✅ Lệnh chạy thành công."
                                         await send_telegram_message(f"📟 <b>Terminal:</b>\n<pre>{output[:3900]}</pre>")
-                                    except Exception as e: await send_telegram_message(f"❌ Lỗi Terminal: {str(e)}")
+                                    except Exception as e: await send_telegram_message(f"❌ Lỗi Terminal: {e}")
                                         
                                 elif text in ["/start", "/menu", "menu"]: await send_telegram_menu()
                                 elif text in ["/ram", "/hw"]:
                                     cpu = await asyncio.to_thread(psutil.cpu_percent, 0.5); ram = psutil.virtual_memory()
                                     await send_telegram_message(f"🎛️ CPU: {cpu}%\n▪️ RAM: {ram.percent}%")
                                 
-                                # D. LỆNH RESTART TÍCH HỢP KHÓA 2 PHÚT
                                 elif text == "/restart":
                                     current_time = time.time()
                                     if os.path.exists(RESTART_LOCK_FILE):
                                         try:
                                             with open(RESTART_LOCK_FILE, "r") as f:
-                                                if current_time - float(f.read().strip()) < 120:
-                                                    await send_telegram_message("⏳ Hệ thống vừa khởi động lại. Sếp vui lòng đợi 2 phút!")
-                                                    continue
+                                                if current_time - float(f.read().strip()) < 120: continue
                                         except: pass
                                     with open(RESTART_LOCK_FILE, "w") as f: f.write(str(current_time))
                                     await send_telegram_message("🔄 Đang tiến hành restart hệ thống...")
-                                    try:
-                                        await client.get(url, params={"offset": update_id, "timeout": 2})
-                                        import sys; os.execl(sys.executable, sys.executable, *sys.argv)
-                                    except Exception as e: await send_telegram_message(f"❌ Không thể restart: {str(e)}")
+                                    await client.get(url, params={"offset": update_id, "timeout": 2})
+                                    import sys; os.execl(sys.executable, sys.executable, *sys.argv)
                                         
                                 elif text.startswith("/weather"):
                                     city = text.split(maxsplit=1)[1] if len(text.split()) > 1 else "Phu Quoc"
@@ -194,7 +218,7 @@ async def telegram_polling_task():
                                         if w_res.status_code == 200: await send_telegram_message(f"🌤️ <b>{city.upper()}</b>: {w_res.text}")
                                     except Exception as e: await send_telegram_message(f"❌ Lỗi thời tiết: {e}")
                                         
-                                # E. BỘ NÃO DJ PHÁT NHẠC
+                                # D. LỆNH DJ ÂM NHẠC
                                 elif re.search(r'^(bật|phát|nghe|mở|tìm|cho\s+sếp)\b', text.lower()):
                                     text_lower = text.lower()
                                     is_video = bool(re.search(r'\b(video|mv|mp4)\b', text_lower))
@@ -227,12 +251,8 @@ async def telegram_polling_task():
                                         out_tmpl = os.path.join(TEMP_DL_DIR, f"dl_{tmp_id}.%(ext)s")
                                         yt_dlp_base = f'"{os.path.expanduser("~/myenv/bin/python3")}" -m yt_dlp'
                                         
-                                        if is_video:
-                                            cmd = f'{yt_dlp_base} -f "best[ext=mp4]/best" "ytsearch1:{song_name} official mv" -o "{out_tmpl}" --max-filesize 45M'
-                                            send_method, file_key = "sendVideo", "video"
-                                        else:
-                                            cmd = f'{yt_dlp_base} -f "bestaudio" -x --audio-format mp3 "ytsearch1:{song_name} karaoke beat" -o "{out_tmpl}" --max-filesize 45M' if is_beat else f'{yt_dlp_base} -f "bestaudio" -x --audio-format mp3 "ytsearch1:{song_name} official audio" -o "{out_tmpl}" --max-filesize 45M'
-                                            send_method, file_key = "sendAudio", "audio"
+                                        cmd = f'{yt_dlp_base} -f "best[ext=mp4]/best" "ytsearch1:{song_name} official mv" -o "{out_tmpl}" --max-filesize 45M' if is_video else f'{yt_dlp_base} -f "bestaudio" -x --audio-format mp3 "ytsearch1:{song_name} karaoke beat" -o "{out_tmpl}" --max-filesize 45M' if is_beat else f'{yt_dlp_base} -f "bestaudio" -x --audio-format mp3 "ytsearch1:{song_name} official audio" -o "{out_tmpl}" --max-filesize 45M'
+                                        send_method, file_key = ("sendVideo", "video") if is_video else ("sendAudio", "audio")
                                         
                                         await asyncio.to_thread(subprocess.run, cmd, shell=True)
                                         dl_file = next((f for f in os.listdir(TEMP_DL_DIR) if f.startswith(f"dl_{tmp_id}")), None)
@@ -270,18 +290,35 @@ async def telegram_polling_task():
                                     if chat_id in pending_ytdl_tasks and pending_ytdl_tasks[chat_id]["task_id"] == tid:
                                         pending_ytdl_tasks[chat_id]["format"] = fmt
                                         task_info = pending_ytdl_tasks[chat_id]
+                                        
+                                        # Lấy URL web chuẩn xác để gán vào nút
+                                        web_deep_link = get_web_ui_url(task_info["url"])
+                                        
                                         if fmt == "mp4":
                                             kb = {"inline_keyboard": []}
+                                            has_large_files = False
                                             for h in sorted(task_info["video_sizes"].keys(), reverse=True):
                                                 sz = task_info["video_sizes"][h]
-                                                btn_text = f"🎬 {h}p • {sz} MB" if sz > 0 else f"🎬 {h}p"
-                                                kb["inline_keyboard"].append([{"text": btn_text, "callback_data": f"ytdl_dl_{tid}_{h}"}])
+                                                if sz <= 49.5:
+                                                    btn_text = f"🎬 {h}p • {sz} MB" if sz > 0 else f"🎬 {h}p"
+                                                    kb["inline_keyboard"].append([{"text": btn_text, "callback_data": f"ytdl_dl_{tid}_{h}"}])
+                                                else: has_large_files = True
+                                            if has_large_files:
+                                                kb["inline_keyboard"].append([{"text": "🌐 Tải chất lượng cao (>50MB)", "url": web_deep_link}])
                                             await send_telegram_message(f"🎬 <b>{task_info['title']}</b>\nChọn độ phân giải:", reply_markup=kb)
+                                            
                                         elif fmt == "mp3":
-                                            kb = {"inline_keyboard": [
-                                                [{"text": f"🎧 320kbps • {task_info['audio_320']} MB", "callback_data": f"ytdl_dl_{tid}_320"}],
-                                                [{"text": f"🎵 128kbps • {task_info['audio_128']} MB", "callback_data": f"ytdl_dl_{tid}_128"}]
-                                            ]}
+                                            kb = {"inline_keyboard": []}
+                                            a320, a128 = task_info['audio_320'], task_info['audio_128']
+                                            has_large_mp3 = False
+                                            
+                                            if a320 <= 49.5: kb["inline_keyboard"].append([{"text": f"🎧 320kbps • {a320} MB", "callback_data": f"ytdl_dl_{tid}_320"}])
+                                            else: has_large_mp3 = True
+                                            
+                                            if a128 <= 49.5: kb["inline_keyboard"].append([{"text": f"🎵 128kbps • {a128} MB", "callback_data": f"ytdl_dl_{tid}_128"}])
+                                            else: has_large_mp3 = True
+                                            
+                                            if has_large_mp3: kb["inline_keyboard"].append([{"text": "🌐 Tải Âm thanh quá lớn (>50MB)", "url": web_deep_link}])
                                             await send_telegram_message(f"🎧 <b>{task_info['title']}</b>\nChọn chất lượng:", reply_markup=kb)
                                 
                                 # YT: Tải xuống
@@ -308,7 +345,7 @@ async def telegram_polling_task():
                                         opt = "vocal" if "vocal" in data_cb else "beat" if "beat" in data_cb else "lyric" if "lyric" in data_cb else "all"
                                         asyncio.create_task(trigger_audio_processing(chat_id, task_data["file_id"], task_data["chosen_name"], task_data["original_filename"], opt))
                                 
-                                # Các nút Menu cũ (Tunnel, Check phần cứng...)
+                                # Các nút Menu cũ
                                 from api.dashboard import api_status_db
                                 from scripts.network_tunnel import start_tunnel, stop_tunnel, get_tunnel_url
                                 
@@ -316,7 +353,20 @@ async def telegram_polling_task():
                                     if not api_status_db["internet_tunnel"]["active"]:
                                         start_tunnel()
                                         await send_telegram_message("⏳ Đang bật Cloudflare Tunnel...")
-                                    else: stop_tunnel()
+                                        link_found = ""
+                                        for _ in range(15):
+                                            await asyncio.sleep(1)
+                                            link_found = get_tunnel_url()
+                                            if link_found: break
+                                        if link_found:
+                                            api_status_db["internet_tunnel"]["public_url"] = link_found
+                                            await send_telegram_message(f"✅ Tunnel đã mở!\n🌐 Link: {link_found}")
+                                        else: await send_telegram_message("⚠️ Mạng chậm, lát ấn lại sếp nhé.")
+                                    else:
+                                        stop_tunnel()
+                                        api_status_db["internet_tunnel"]["public_url"] = ""
+                                        await send_telegram_message("🔴 Đã ngắt kết nối Cloudflare Tunnel!")
+                                    await send_telegram_menu()
                                 elif data_cb == "server_stats":
                                     await send_telegram_message(f"🎛️ CPU: {psutil.cpu_percent()}%\n🧠 RAM: {psutil.virtual_memory().percent}%")
                                 elif data_cb == "clean_trash":
