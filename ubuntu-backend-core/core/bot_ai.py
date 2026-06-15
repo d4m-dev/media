@@ -91,12 +91,13 @@ def get_latest_lyrics_context() -> str:
     return ""
 
 # ==========================================
-# 🚀 HÀM ĐỒNG BỘ: CHẠY NỘI TRONG THREAD
+# 🚀 HÀM ĐỒNG BỘ: CHẠY NỘI TRONG THREAD (GIỮ NGUYÊN LOGIC CỦA SẾP)
 # ==========================================
 def sync_ai_worker(chat_id: str, message: str, is_admin_mode: bool, context_addon: str):
     global cached_available_models
     client = genai.Client(api_key=settings.GEMINI_API_KEY)
     
+    # BỘ LỌC VÀ LẤY MODEL SIÊU CHUẨN (Khắc phục 100% lỗi 404)
     if not cached_available_models:
         try: cached_available_models = [m.name for m in client.models.list() if 'gemini' in m.name.lower()]
         except: pass
@@ -225,7 +226,6 @@ async def process_telegram_ai(chat_id: str, message: str) -> dict:
                     api_status_db["internet_tunnel"]["public_url"] = ""
                     reply_text += "\n\n🔴 <b>Hệ thống xác nhận:</b> Đã ngắt kết nối Cloudflare Tunnel thành công!"
             
-            # (Nếu sau này sếp có thêm dịch vụ khác ngoài tunnel, nó sẽ chạy qua đoạn lưu trạng thái này)
             api_status_db[toggle_target]["active"] = new_state
             if action_taken is None:
                 action_taken = f"Lệnh phần cứng: {'BẬT' if new_state else 'TẮT'} {toggle_target}"

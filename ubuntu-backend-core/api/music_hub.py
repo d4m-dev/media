@@ -9,10 +9,50 @@ router = APIRouter(
     tags=["Music Hub API"]
 )
 
-# Nhận diện đường dẫn gốc: ubuntu-backend-core/audio_workspace/music/
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MUSIC_DIR = os.path.join(BASE_DIR, "audio_workspace", "music")
 
+# ==========================================
+# 🔍 HÀM BỔ TRỢ: BÓC TÁCH METADATA TỪ FILE .LRC
+# ==========================================
+def parse_lrc_metadata(lrc_path: str, default_title: str) -> dict:
+    """Đọc file .lrc và trích xuất thông tin ti, ar, al, by nếu có"""
+    metadata = {
+        "title": default_title,
+        "artist": "d4m-dev Studio",
+        "album": "Single",
+        "by": "AI Engine"
+    }
+    
+    if not os.path.exists(lrc_path):
+        return metadata
+        
+    try:
+        with open(lrc_path, "r", encoding="utf-8") as f:
+            content = f.read()
+            
+            # Sử dụng Regex tìm kiếm không phân biệt chữ hoa chữ thường
+            ti_match = re.search(r'\[ti:\s*(.*?)\]', content, re.IGNORECASE)
+            ar_match = re.search(r'\[ar:\s*(.*?)\]', content, re.IGNORECASE)
+            al_match = re.search(r'\[al:\s*(.*?)\]', content, re.IGNORECASE)
+            by_match = re.search(r'\[by:\s*(.*?)\]', content, re.IGNORECASE)
+            
+            if ti_match and ti_match.group(1).strip():
+                metadata["title"] = ti_match.group(1).strip()
+            if ar_match and ar_match.group(1).strip():
+                metadata["artist"] = ar_match.group(1).strip()
+            if al_match and al_match.group(1).strip():
+                metadata["album"] = al_match.group(1).strip()
+            if by_match and by_match.group(1).strip():
+                metadata["by"] = by_match.group(1).strip()
+    except Exception as e:
+        print(f"⚠️ Lỗi bóc dữ liệu LRC: {e}")
+        
+    return metadata
+
+# ==========================================
+# 🎧 LÕI STREAMING & ĐỌC FILE
+# ==========================================
 def chunked_file_reader(file_path: str, start: int, end: int, chunk_size: int = 1024 * 1024):
     """Cưa file MP3/MP4 thành các khối 1MB để Stream mượt mà"""
     with open(file_path, "rb") as f:
@@ -32,7 +72,6 @@ async def stream_media(folder: str, filename: str, request: Request):
     file_size = os.path.getsize(file_path)
     range_header = request.headers.get("Range")
     
-    # Định dạng Content-Type dựa trên đuôi file
     content_type = "video/mp4" if filename.endswith(".mp4") else "audio/mpeg"
 
     if range_header:
@@ -60,7 +99,6 @@ async def get_cover(folder: str):
     """API Lấy ảnh bìa (cover.jpg)"""
     cover_path = os.path.join(MUSIC_DIR, folder, "cover.jpg")
     if not os.path.exists(cover_path):
-         # Trả về một ảnh mặc định nếu bài hát chưa có cover
          raise HTTPException(status_code=404, detail="Không tìm thấy ảnh bìa")
     return FileResponse(cover_path, media_type="image/jpeg")
 
@@ -90,32 +128,56 @@ async def get_lyrics(folder: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==========================================
-# 📂 NÂNG CẤP: TỰ ĐỘNG QUÉT THƯ VIỆN NHẠC
+# 📂 NÂNG CẤP: TỰ ĐỘNG QUÉT & PHÂN LOẠI THƯ VIỆN NHẠC
 # ==========================================
 @router.get("/list")
 async def get_music_list():
-    """
-    API Quét thư mục: Tự động tìm tất cả các bài hát sếp đã bỏ vào /music/
-    """
+    """API Quét thư mục & Nhận diện cờ Karaoke/Lyrics và Metadata LRC"""
     if not os.path.exists(MUSIC_DIR):
         return {"status": "success", "songs": []}
 
     songs = []
     try:
-        # Quét tất cả các thư mục con
         for folder_name in os.listdir(MUSIC_DIR):
             folder_path = os.path.join(MUSIC_DIR, folder_name)
             
-            # Chỉ lấy các thư mục (bỏ qua file rác nếu có)
             if os.path.isdir(folder_path):
-                # Format lại tên cho đẹp (VD: xuanhuyhoang -> Xuanhuyhoang)
                 display_name = folder_name.replace("-", " ").replace("_", " ").title()
                 
-                songs.append({
-                    "id": folder_name,
-                    "title": display_name,
-                    "cover_api": f"/api/music/cover/{folder_name}"
-                })
+                # Quét nhanh xem bài này có các vũ khí gì
+                files = os.listdir(folder_path)
+                has_lyrics = "1.lrc" in files
+                has_vocal = "2.mp3" in files
+                has_beat = "3.mp3" in files
+                has_video = "4.mp4" in files
+                
+                # Mặc định thông số
+                song_title = display_name
+                artist_name = "d4m-dev Studio"
+                album_name = "Single"
+
+                # Đọc metadata từ 1.lrc nếu có
+                if has_lyrics:
+                    meta = parse_lrc_metadata(os.path.join(folder_path, "1.lrc"), display_name)
+                    song_title = meta["title"]
+                    artist_name = meta["artist"]
+                    album_name = meta["album"]
+                
+                # Chỉ hiển thị nếu có ít nhất 1 file nhạc/video
+                if has_vocal or has_beat or has_video:
+                    songs.append({
+                        "id": folder_name,
+                        "title": song_title,
+                        "artist": artist_name,
+                        "album": album_name,
+                        "cover_api": f"/api/music/cover/{folder_name}",
+                        "flags": {
+                            "vocal": has_vocal,
+                            "beat": has_beat,
+                            "lyrics": has_lyrics,
+                            "video": has_video
+                        }
+                    })
                 
         return {"status": "success", "total": len(songs), "songs": songs}
     except Exception as e:

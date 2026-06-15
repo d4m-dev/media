@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     DB_PASS: str = ""
     DB_NAME: str = "social_hub"
 
+    DB_ADMIN_PORT: int = 8888
+
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
     GEMINI_API_KEY: str = ""

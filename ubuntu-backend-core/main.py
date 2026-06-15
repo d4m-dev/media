@@ -43,14 +43,15 @@ def start_background_services():
         print("⏳ Đang tải Giao diện Adminer...")
         os.system(f"wget -q https://github.com/vrana/adminer/releases/download/v4.8.1/adminer-4.8.1-mysql.php -O {adminer_file}")
     
-    # 3. Kích nổ máy chủ PHP ngầm cho Adminer trên cổng 8888
+    # 3. Kích nổ máy chủ PHP ngầm cho Adminer trên cổng {admin_port}
     try:
+        admin_port = settings.DB_ADMIN_PORT
         php_process = subprocess.Popen(
-            ["php", "-S", "0.0.0.0:8888", "-t", db_admin_dir],
+            ["php", "-S", f"0.0.0.0:{admin_port}", "-t", db_admin_dir],
             stdout=subprocess.DEVNULL, 
             stderr=subprocess.DEVNULL
         )
-        print(f"✅ Giao diện DB: Sẵn sàng tại http://{settings.HOST}:8888")
+        print(f"✅ Giao diện DB: Sẵn sàng tại http://{settings.HOST}:{admin_port}")
         atexit.register(lambda: php_process.terminate())
     except Exception as e:
         print(f"⚠️ PHP Server không khởi động được (Sếp nhớ cài php-cli nhé): {e}")

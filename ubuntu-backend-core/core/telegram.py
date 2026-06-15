@@ -4,6 +4,7 @@ import psutil
 import os
 import shutil
 import subprocess
+import re
 from datetime import datetime
 from core.config import settings
 
@@ -82,20 +83,30 @@ async def send_telegram_menu():
         "🎛️ <b>TRUNG TÂM CHỈ HUY UBUNTU CORE</b>\n\n"
         "💡 <b>Mẹo nâng cấp:</b>\n"
         "- Khi gửi file Nhạc/Video, hãy nhập tên bài hát vào phần <b>Chú thích (Caption)</b> để AI tìm đúng lời!\n"
-        "- Gõ <code>> [lệnh bash]</code> để chạy Terminal từ xa.", 
+        "- Gõ <code>> [lệnh bash]</code> để chạy Terminal từ xa.\n"
+        "- Lệnh nhanh: <code>/ram</code>, <code>/restart</code>, <code>/weather</code>\n"
+        "- Lệnh DJ: <code>Phát bài [tên]</code>, <code>Mở nhạc beat bài [tên]</code>, <code>Tìm video [tên]</code>", 
         reply_markup=keyboard
     )
 
 # ------------------------------------------------------------
-# LUỒNG XỬ LÝ ÂM THANH NGẦM (Theo đúng Option sếp chọn)
+# LUỒNG XỬ LÝ ÂM THANH NGẦM (🚀 VÁ LỖI RESULT Ở ĐÂY)
 # ------------------------------------------------------------
 async def trigger_audio_processing(chat_id: str, file_id: str, chosen_name: str, original_filename: str, option: str):
     await send_telegram_message(f"📥 <b>Đang nạp file vào hệ sinh thái riêng:</b> <code>{chosen_name}</code>...")
     
     try:
-        async with httpx.AsyncClient() as client:
+        # 🚀 Tăng timeout lên 60s để đề phòng mạng yếu
+        async with httpx.AsyncClient(timeout=60.0) as client:
             file_res = await client.get(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/getFile?file_id={file_id}")
-            tg_file_path = file_res.json()["result"]["file_path"]
+            resp_data = file_res.json()
+            
+            # 🚀 KIỂM TRA LỖI API: Nếu Telegram từ chối (Vd: File > 20MB)
+            if not resp_data.get("ok"):
+                error_desc = resp_data.get("description", "Lỗi không xác định")
+                raise Exception(f"Telegram API từ chối tải file: {error_desc}")
+                
+            tg_file_path = resp_data["result"]["file_path"]
             download_url = f"https://api.telegram.org/file/bot{settings.TELEGRAM_BOT_TOKEN}/{tg_file_path}"
             
             from api.audio_engine import sanitize_folder_name, process_audio_pipeline, WORKSPACE_DIR
@@ -111,22 +122,24 @@ async def trigger_audio_processing(chat_id: str, file_id: str, chosen_name: str,
             os.makedirs(project_dir, exist_ok=True)
             
             saved_input_path = os.path.join(project_dir, f"{task_id}{ext}")
+            
+            # Tải file về máy chủ
             file_data = await client.get(download_url)
+            if file_data.status_code != 200:
+                raise Exception(f"Mất kết nối tải file (Mã lỗi: {file_data.status_code})")
+                
             with open(saved_input_path, "wb") as f:
                 f.write(file_data.content)
                 
-            # 🚀 CẤU HÌNH CỜ BẬT TẮT AI DỰA THEO LỰA CHỌN CỦA SẾP
             separate_beat = option in ["vocal", "beat", "all"]
             extract_lyrics = option in ["lyric", "all"]
             
             await send_telegram_message(f"⚙️ <b>Đang chạy AI trích xuất:</b> {clean_name}\n⏳ Sếp cứ làm việc khác, xong mình gửi kết quả qua nhé!")
             
-            # Chạy pipeline theo đúng cờ đã bật
             await asyncio.to_thread(process_audio_pipeline, saved_input_path, clean_name, task_id, ext, separate_beat, extract_lyrics, TELEGRAM_DIR, TELEGRAM_DIR)
             
             await send_telegram_message(f"✅ <b>AI đã làm xong:</b> {clean_name}\n📦 Đang lọc và gửi đúng file sếp yêu cầu...")
             
-            # 🚀 CHỈ CHỌN LỌC NHỮNG FILE SẾP YÊU CẦU ĐỂ GỬI TRẢ
             files_to_send = []
             if option in ["vocal", "all"]: files_to_send.append(f"{task_id}_vocal.mp3")
             if option in ["beat", "all"]: files_to_send.append(f"{task_id}_beat.mp3")
@@ -136,9 +149,10 @@ async def trigger_audio_processing(chat_id: str, file_id: str, chosen_name: str,
                 f_path = os.path.join(project_dir, f_name)
                 if os.path.exists(f_path):
                     with open(f_path, "rb") as f:
-                        await client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendDocument", data={"chat_id": chat_id}, files={"document": f}, timeout=60.0)
+                        # 🚀 Tăng timeout trả file về lên 120s
+                        await client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendDocument", data={"chat_id": chat_id}, files={"document": f}, timeout=120.0)
     except Exception as e:
-        await send_telegram_message(f"❌ Lỗi hạ tầng Audio: {e}")
+        await send_telegram_message(f"❌ Lỗi hạ tầng Audio: {str(e)}")
 
 # ------------------------------------------------------------
 # CORE: VÒNG LẶP LẮNG NGHE CHÍNH
@@ -181,7 +195,6 @@ async def telegram_polling_task():
                                 custom_caption = msg.get("caption", "").strip()
                                 suggested_name = custom_caption if custom_caption else file_name.split('.')[0]
                                 
-                                # Đưa vào trạng thái chờ bước 1 (name)
                                 pending_audio_tasks[chat_id] = {
                                     "step": "name",
                                     "file_id": file_id,
@@ -211,10 +224,10 @@ async def telegram_polling_task():
                             
                             if chat_id == str(settings.TELEGRAM_CHAT_ID).strip():
                                 
-                                # NHẬN TÊN TỪ VĂN BẢN KHI ĐANG Ở BƯỚC 1 (name)
-                                if chat_id in pending_audio_tasks and pending_audio_tasks[chat_id].get("step") == "name" and not text.startswith(">") and text not in ["/start", "/menu", "menu"]:
+                                # NHẬN TÊN TỪ VĂN BẢN
+                                if chat_id in pending_audio_tasks and pending_audio_tasks[chat_id].get("step") == "name" and not text.startswith(">") and not re.search(r'^\/', text):
                                     pending_audio_tasks[chat_id]["chosen_name"] = text
-                                    pending_audio_tasks[chat_id]["step"] = "option" # Chuyển sang bước 2
+                                    pending_audio_tasks[chat_id]["step"] = "option"
                                     
                                     kb_options = {
                                         "inline_keyboard": [
@@ -243,10 +256,164 @@ async def telegram_polling_task():
                                         
                                 elif text in ["/start", "/menu", "menu"]:
                                     await send_telegram_menu()
+                                    
+                                # Lệnh gõ tắt kiểm tra RAM/CPU
+                                elif text in ["/ram", "/hw"]:
+                                    await send_telegram_message("⏳ Đang quét thông số phần cứng...")
+                                    try:
+                                        cpu = await asyncio.to_thread(psutil.cpu_percent, 0.5)
+                                        ram = psutil.virtual_memory()
+                                        disk = psutil.disk_usage('/')
+                                        await send_telegram_message(
+                                            f"🎛️ <b>THÔNG SỐ MÁY CHỦ NHANH</b>\n"
+                                            f"▪️ CPU: {cpu}%\n"
+                                            f"▪️ RAM: {ram.percent}% ({round(ram.used/(1024**3), 1)} GB / {round(ram.total/(1024**3), 1)} GB)\n"
+                                            f"▪️ Disk: {disk.percent}%"
+                                        )
+                                    except Exception as e:
+                                        await send_telegram_message(f"❌ Lỗi khi đọc phần cứng: {str(e)}")
+                                
+                                # Lệnh Khởi động lại Server an toàn
+                                elif text == "/restart":
+                                    await send_telegram_message("🔄 Nhận lệnh! Đang tiến hành dọn dẹp và restart hệ thống...")
+                                    try:
+                                        import sys
+                                        os.execl(sys.executable, sys.executable, *sys.argv)
+                                    except Exception as e:
+                                        await send_telegram_message(f"❌ Không thể restart: {str(e)}")
+                                        
+                                # Lệnh Thời Tiết
+                                elif text.startswith("/weather") or text.startswith("/wether") or text.startswith("/thoitiet"):
+                                    parts = text.split(maxsplit=1)
+                                    city = parts[1] if len(parts) > 1 else "Phu Quoc"
+                                    await send_telegram_message(f"⏳ Đang kết nối vệ tinh lấy thời tiết tại <b>{city}</b>...")
+                                    try:
+                                        weather_url = f"https://vi.wttr.in/{city}?format=%C|%t|%f|%h|%w"
+                                        async with httpx.AsyncClient() as w_client:
+                                            w_res = await w_client.get(weather_url, timeout=10.0)
+                                            if w_res.status_code == 200 and "Unknown location" not in w_res.text:
+                                                w_data = w_res.text.split('|')
+                                                if len(w_data) >= 5:
+                                                    condition, temp, feels_like, humidity, wind = w_data
+                                                    msg = (f"🌤️ <b>THỜI TIẾT TẠI {city.upper()}</b>\n\n☁️ <b>Tình trạng:</b> {condition}\n"
+                                                           f"🌡️ <b>Nhiệt độ:</b> {temp} (Cảm giác: {feels_like})\n💧 <b>Độ ẩm:</b> {humidity}\n"
+                                                           f"💨 <b>Sức gió:</b> {wind}\n\n⚡ <i>Hạ tầng sẵn sàng cho các dự án mới của Sếp!</i>")
+                                                    await send_telegram_message(msg)
+                                                else:
+                                                    await send_telegram_message(f"🌤️ <b>{city.upper()}:</b> {w_res.text}")
+                                            else:
+                                                await send_telegram_message(f"⚠️ Vệ tinh không tìm thấy thành phố: <b>{city}</b>.")
+                                    except Exception as e:
+                                        await send_telegram_message(f"❌ Lỗi vệ tinh thời tiết: {str(e)}")
+                                        
+                                # 🚀 BỘ NÃO DJ PHÁT NHẠC (NÂNG CẤP SIÊU REGEX)
+                                elif re.search(r'^(bật|phát|nghe|mở|tìm|cho\s+sếp)\b', text.lower()):
+                                    text_lower = text.lower()
+                                    await send_telegram_message("🔎 <b>Đang phân tích yêu cầu âm nhạc của Sếp...</b>")
+                                    
+                                    is_video = bool(re.search(r'\b(video|mv|mp4)\b', text_lower))
+                                    is_beat = bool(re.search(r'\b(beat|karaoke|nhạc nền|không lời)\b', text_lower))
+                                    
+                                    # MÁY SẤY TỪ KHÓA: Bóc từng lớp vỏ câu lệnh
+                                    song_name = text_lower
+                                    
+                                    # 1. Bóc lớp vỏ lệnh (bật, phát, cho sếp...)
+                                    song_name = re.sub(r'^(bật|phát|nghe|mở|tìm|cho\s+sếp|cho\s+xin|xin)\s+', '', song_name).strip()
+                                    
+                                    # 2. Bóc lớp vỏ bổ trợ (cái, bài hát, nhạc beat...) lặp lại 3 lần để sạch bách
+                                    for _ in range(3):
+                                        song_name = re.sub(r'^(cái|bản|nhạc|bài\s+hát|bài|video|mv|beat|karaoke|nhạc\s+nền|của)\s+', '', song_name).strip()
+                                        
+                                    # 3. Chặt cái đuôi cảm thán (đi em, nhé sếp...)
+                                    song_name = re.sub(r'\s+(nhé|nha|đi\s+em|đi|nữa|giúp\s+sếp|với)$', '', song_name).strip()
+                                    
+                                    if not song_name:
+                                        await send_telegram_message("⚠️ Bật bài gì đây Sếp ơi? Sếp gõ thêm tên bài giúp mình nhé!")
+                                        continue
+
+                                    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                                    MUSIC_DIR = os.path.join(BASE_DIR, "audio_workspace", "music")
+                                    
+                                    found_folder = None
+                                    if os.path.exists(MUSIC_DIR):
+                                        for folder in os.listdir(MUSIC_DIR):
+                                            if song_name.replace(" ", "") in folder.replace("-", "").replace("_", "").lower():
+                                                found_folder = folder
+                                                break
+                                    
+                                    # NẾU TÌM THẤY TRONG MÁY CHỦ
+                                    if found_folder:
+                                        folder_path = os.path.join(MUSIC_DIR, found_folder)
+                                        target_file = "4.mp4" if is_video else ("3.mp3" if is_beat else "2.mp3")
+                                        file_path = os.path.join(folder_path, target_file)
+                                        
+                                        if not os.path.exists(file_path):
+                                            file_path = os.path.join(folder_path, "2.mp3")
+                                        
+                                        if os.path.exists(file_path):
+                                            await send_telegram_message(f"💿 <b>Đã tìm thấy bài:</b> <code>{found_folder}</code> trên Server.\n⏳ Đang chuyển phát nhanh lên Telegram...")
+                                            try:
+                                                async with httpx.AsyncClient() as dl_client:
+                                                    with open(file_path, "rb") as f:
+                                                        if file_path.endswith(".mp4"):
+                                                            await dl_client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendVideo", data={"chat_id": chat_id}, files={"video": f}, timeout=120.0)
+                                                        else:
+                                                            await dl_client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendAudio", data={"chat_id": chat_id}, files={"audio": f}, timeout=120.0)
+                                            except Exception as e:
+                                                await send_telegram_message(f"❌ Lỗi gửi file nội bộ: {e}")
+                                            continue 
+                                            
+                                    # NẾU KHÔNG CÓ -> TẢI BẰNG PYTHON TRONG MYENV
+                                    await send_telegram_message(f"🌐 Không có sẵn bài <b>{song_name.title()}</b> trong Server.\n🛸 <i>Đang kích hoạt yt-dlp thăm dò trên Internet...</i>")
+                                    
+                                    try:
+                                        import uuid
+                                        from api.audio_engine import WORKSPACE_DIR
+                                        
+                                        TEMP_DL_DIR = os.path.join(WORKSPACE_DIR, "temp_downloads")
+                                        os.makedirs(TEMP_DL_DIR, exist_ok=True)
+                                        
+                                        tmp_id = str(uuid.uuid4())[:8]
+                                        out_tmpl = os.path.join(TEMP_DL_DIR, f"dl_{tmp_id}.%(ext)s")
+                                        
+                                        python_exec = os.path.expanduser("~/myenv/bin/python3")
+                                        yt_dlp_base = f'"{python_exec}" -m yt_dlp'
+                                        
+                                        # 🚀 FIX LỖI VIDEO CÂM: ÉP YT-DLP TẢI ĐỊNH DẠNG MP4 ĐÃ GỘP SẴN ÂM THANH
+                                        if is_video:
+                                            cmd = f'{yt_dlp_base} -f "best[ext=mp4]/best" "ytsearch1:{song_name} official mv" -o "{out_tmpl}" --max-filesize 45M'
+                                            send_method = "sendVideo"
+                                            file_key = "video"
+                                        else:
+                                            search_q = f"{song_name} {'karaoke beat' if is_beat else 'official audio'}"
+                                            cmd = f'{yt_dlp_base} -f "bestaudio" -x --audio-format mp3 "ytsearch1:{search_q}" -o "{out_tmpl}" --max-filesize 45M'
+                                            send_method = "sendAudio"
+                                            file_key = "audio"
+                                        
+                                        result = await asyncio.to_thread(subprocess.run, cmd, shell=True, capture_output=True, text=True)
+                                        
+                                        downloaded_file = None
+                                        for f in os.listdir(TEMP_DL_DIR):
+                                            if f.startswith(f"dl_{tmp_id}"):
+                                                downloaded_file = os.path.join(TEMP_DL_DIR, f)
+                                                break
+                                                
+                                        if downloaded_file:
+                                            await send_telegram_message(f"✅ Đã tải xong bài <b>{song_name.title()}</b>! Đang gửi cho Sếp...")
+                                            async with httpx.AsyncClient() as dl_client:
+                                                with open(downloaded_file, "rb") as f:
+                                                    await dl_client.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{send_method}", data={"chat_id": chat_id}, files={file_key: f}, timeout=120.0)
+                                            os.remove(downloaded_file)
+                                        else:
+                                            err_msg = result.stderr if result.stderr else "Quá dung lượng 45MB của Telegram hoặc không tìm thấy bài hát."
+                                            await send_telegram_message(f"❌ <b>Báo cáo lỗi yt-dlp:</b>\n<pre>{err_msg[:500]}</pre>")
+                                            
+                                    except Exception as e:
+                                         await send_telegram_message(f"❌ Lỗi tiến trình tải mạng: {e}")
+
                                 else:
                                     await send_telegram_message("⏳ <i>AI đang suy nghĩ...</i>")
                                     try:
-                                        # 🚀 GỌI NÃO BỘ MỚI TẠI ĐÂY
                                         from core.bot_ai import process_telegram_ai
                                         ai_res = await process_telegram_ai(chat_id, text)
                                         
@@ -268,7 +435,6 @@ async def telegram_polling_task():
                             
                             if chat_id == str(settings.TELEGRAM_CHAT_ID).strip():
                                 
-                                # XÁC NHẬN DÙNG TÊN MẶC ĐỊNH (BƯỚC 1 -> BƯỚC 2)
                                 if data_cb == "confirm_audio_name":
                                     if chat_id in pending_audio_tasks and pending_audio_tasks[chat_id].get("step") == "name":
                                         suggested = pending_audio_tasks[chat_id]["suggested_name"]
@@ -287,7 +453,6 @@ async def telegram_polling_task():
                                     else:
                                         await send_telegram_message("⚠️ Yêu cầu đã hết hạn hoặc bị lỗi trạng thái.")
                                         
-                                # NHẬN LỰA CHỌN TRÍCH XUẤT (BƯỚC 2 -> CHẠY NGẦM)
                                 elif data_cb in ["extract_vocal", "extract_beat", "extract_lyric", "extract_all"]:
                                     if chat_id in pending_audio_tasks and pending_audio_tasks[chat_id].get("step") == "option":
                                         task_data = pending_audio_tasks.pop(chat_id)
@@ -302,13 +467,11 @@ async def telegram_polling_task():
                                     else:
                                         await send_telegram_message("⚠️ Yêu cầu không còn hiệu lực.")
                                         
-                                # HỦY BỎ FILE
                                 elif data_cb == "cancel_audio_name":
                                     if chat_id in pending_audio_tasks:
                                         pending_audio_tasks.pop(chat_id)
                                         await send_telegram_message("❌ Đã hủy quá trình xử lý dự án.")
 
-                                # CÁC LỆNH HỆ THỐNG KHÁC (Tunnel, HW, Cleanup...)
                                 from api.dashboard import api_status_db
                                 from scripts.network_tunnel import start_tunnel, stop_tunnel, get_tunnel_url
                                 
