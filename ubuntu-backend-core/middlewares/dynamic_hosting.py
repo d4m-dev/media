@@ -23,10 +23,11 @@ class DynamicHostingMiddleware:
 
         path = scope["path"]
 
+        # 🚀 FIX LỖI: Thêm "/images/" vào luồng miễn trừ để hệ thống tải được Avatar
         if (path == "/" or path.startswith("/api/") or path.startswith("/ws/") or 
             path.startswith("/css/") or path.startswith("/js/") or path.startswith("/audio-files/") or 
-            path.startswith("/admin/") or path.startswith("/branding-assets/") or path.startswith("/src/") or 
-            path.endswith(".html")):
+            path.startswith("/images/") or path.startswith("/admin/") or path.startswith("/branding-assets/") or 
+            path.startswith("/src/") or path.endswith(".html")):
             return await self.app(scope, receive, send)
 
         parts = [p for p in path.split("/") if p]
