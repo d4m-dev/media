@@ -29,8 +29,22 @@
             <div class="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover:scale-110 transition-transform">
                 <i class="fa-solid fa-fingerprint text-xs text-white"></i>
             </div>
-            <span id="txtHeaderAuth" class="font-bold tracking-wide">Đăng nhập D4M ID</span>
+            <span class="font-bold tracking-wide">Đăng nhập D4M ID</span>
         </button>
+
+        <div id="userProfileWidget" class="hidden flex items-center space-x-3 bg-white/5 border border-white/10 rounded-full pr-2 pl-1 py-1 backdrop-blur-md shadow-lg transition hover:bg-white/10">
+            <a href="/profile.html" class="flex items-center space-x-3 pr-4 pl-1 py-1 rounded-full cursor-pointer group">
+                <img id="headerAvatar" src="/src/favicon/ubuntu-backend/favicon-96x96.png" class="w-9 h-9 rounded-full border-2 border-blue-500/50 object-cover shadow-[0_0_10px_rgba(59,130,246,0.4)] group-hover:border-blue-400 transition-colors">
+                <div class="text-left">
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">Xin chào,</p>
+                    <p id="headerUsername" class="font-bold text-sm text-white leading-none group-hover:text-blue-300 transition-colors">Loading...</p>
+                </div>
+            </a>
+            <div class="w-px h-6 bg-white/10"></div>
+            <button onclick="handleLogout()" class="w-8 h-8 rounded-full bg-red-500/10 hover:bg-red-500/30 text-red-400 flex items-center justify-center transition border border-red-500/20" title="Đăng xuất khỏi hệ sinh thái">
+                <i class="fa-solid fa-power-off text-xs"></i>
+            </button>
+        </div>
     </header>
 
     <main class="flex-grow max-w-7xl mx-auto px-6 w-full relative z-10">
@@ -77,35 +91,57 @@
             }, 3000);
         }
 
-        // 🚀 KIỂM TRA TRẠNG THÁI SSO SAU KHI VỪA REDIRECT VỀ
-        function checkLoginStatus() {
+        // 🚀 KIỂM TRA TRẠNG THÁI LOGIN VÀ GỌI DỮ LIỆU PROFILE
+        async function checkLoginStatus() {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('login') === 'success') {
                 showToast('✅ Xác thực D4M ID thành công! Chào mừng trở lại.');
-                // Xóa parameter trên URL để F5 không bị lặp lại Toast
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
             const token = localStorage.getItem('d4m_sso_token');
             if (token) {
-                // Đổi giao diện Nút Header nếu đã đăng nhập
-                const btn = document.getElementById('btnHeaderAuth');
-                document.getElementById('txtHeaderAuth').innerText = "Vào không gian nội bộ";
-                btn.classList.add('border-green-500/30');
+                // Đảo giao diện Header
+                document.getElementById('btnHeaderAuth').classList.add('hidden');
+                document.getElementById('userProfileWidget').classList.remove('hidden');
+
+                // Bắn API kéo thông tin người dùng từ Backend về
+                try {
+                    const res = await fetch('/api/auth/profile/me', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        // Cập nhật Avatar và Tên từ Database
+                        document.getElementById('headerAvatar').src = data.data.avatar_url;
+                        document.getElementById('headerUsername').innerText = data.data.full_name || data.data.username;
+                    } else {
+                        // Nếu Token hết hạn hoặc sai, tự động đăng xuất
+                        handleLogout(false);
+                    }
+                } catch (e) {
+                    console.log("Không thể kết nối máy chủ để lấy Profile");
+                }
             }
         }
 
-        // 🚀 HÀM ĐIỀU HƯỚNG THÔNG MINH
+        // 🚀 HÀM ĐIỀU HƯỚNG ĐĂNG NHẬP
         function redirectToAuth() {
-            const token = localStorage.getItem('d4m_sso_token');
-            if (token) {
-                showToast("Sếp đã đăng nhập rồi! Vui lòng chọn dự án bên dưới.", "success");
-            } else {
-                // Gắn theo đuôi redirect để web biết đường quay về
-                window.location.href = `/auth.html?redirect=${window.location.pathname}`;
-            }
+            window.location.href = `/auth.html?redirect=${window.location.pathname}`;
         }
 
+        // 🚀 HÀM XỬ LÝ ĐĂNG XUẤT (XÓA VÍ TOKEN)
+        function handleLogout(showMsg = true) {
+            localStorage.removeItem('d4m_sso_token');
+            if(showMsg) {
+                alert("Đã đăng xuất khỏi hệ sinh thái D4M.");
+            }
+            window.location.reload();
+        }
+
+        // ==========================================
+        // DỮ LIỆU VÀ HÀM VẼ CÁC CARD DỰ ÁN (GIỮ NGUYÊN)
+        // ==========================================
         const coreApps = [
             { name: "Glass Town", path: "glass-town", desc: "Game Nông Trại & Tương tác 2.5D", icon: "fa-gamepad", color: "#e94560" },
             { name: "Music Pro", path: "music-pro.html", desc: "Trình phát nhạc chuẩn Premium", icon: "fa-compact-disc", color: "#3b82f6" },

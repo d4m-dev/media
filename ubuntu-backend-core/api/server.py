@@ -112,6 +112,9 @@ app.mount("/js", StaticFiles(directory=os.path.join(PUBLIC_DIR, "js")), name="js
 os.makedirs(AUDIO_OUTPUT_DIR, exist_ok=True)
 app.mount("/audio-files", StaticFiles(directory=AUDIO_OUTPUT_DIR), name="audio_files")
 
+os.makedirs(os.path.join(PUBLIC_DIR, "images"), exist_ok=True)
+app.mount("/images", StaticFiles(directory=os.path.join(PUBLIC_DIR, "images")), name="images")
+
 os.makedirs(SCRIPTS_DIR, exist_ok=True)
 app.mount("/scripts", StaticFiles(directory=SCRIPTS_DIR), name="scripts")
 
@@ -188,3 +191,9 @@ async def serve_yt_downloader():
     html_path = os.path.join(PUBLIC_DIR, "yt-downloader.html")
     if os.path.exists(html_path): return FileResponse(html_path)
     return {"status": "error", "message": "Không tìm thấy yt-downloader.html"}
+
+@app.get("/profile.html")
+async def serve_profile():
+    profile_path = os.path.join(PUBLIC_DIR, "profile.html")
+    if os.path.exists(profile_path): return FileResponse(profile_path)
+    return {"status": "error", "message": "Không tìm thấy profile.html"}

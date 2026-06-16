@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header, UploadFile, File, Depends
 from pydantic import BaseModel
 from core.security import verify_password, create_access_token, ADMIN_USERNAME
 from core.database import db_manager
@@ -7,9 +7,13 @@ import string
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import jwt
+import shutil
+import os
+from dotenv import load_dotenv
 
-# 🚀 GỌI BỘ CẤU HÌNH HỆ THỐNG .ENV TỪ CORE
-from core.config import settings
+# Ép hệ thống nạp file .env ngay lập tức
+load_dotenv()
 
 router = APIRouter(
     prefix="/api/auth",
@@ -23,13 +27,13 @@ SMTP_PORT = 587
 def send_otp_email(to_email: str, otp_code: str, username: str):
     """Hàm nội bộ gửi Email OTP qua Giao thức SMTP bảo mật"""
     
-    # 🚀 LẤY TÀI KHOẢN VÀ MẬT KHẨU TỪ FILE .ENV QUA SETTINGS
-    sender_email = getattr(settings, "SENDER_EMAIL", None)
-    sender_password = getattr(settings, "SENDER_PASSWORD", None)
+    # LẤY TRỰC TIẾP TỪ FILE .ENV (Không qua class settings nữa)
+    sender_email = os.getenv("SENDER_EMAIL")
+    sender_password = os.getenv("SENDER_PASSWORD")
     
-    # Kiểm tra xem sếp đã điền cấu hình trong file .env chưa
+    # Kênh an toàn: Kiểm tra nếu quên điền .env
     if not sender_email or not sender_password:
-        print("⚠️ Lỗi hệ thống: Chưa cấu hình SENDER_EMAIL hoặc SENDER_PASSWORD trong file .env!")
+        print("⚠️ Lỗi hệ thống: Không tìm thấy SENDER_EMAIL hoặc SENDER_PASSWORD trong file .env!")
         return False
 
     try:
@@ -65,6 +69,18 @@ def send_otp_email(to_email: str, otp_code: str, username: str):
         print(f"❌ Lỗi gửi Email SMTP: {e}")
         return False
 
+# Hàm nội bộ: Bóc tách Token để lấy User ID
+def get_current_user_id(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Vui lòng đăng nhập lại.")
+    token = authorization.split(" ")[1]
+    try:
+        # Giải mã token (Bypass verify signature cho prototype)
+        payload = jwt.decode(token, options={"verify_signature": False})
+        return payload.get("id"), payload.get("sub")
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token hết hạn hoặc lỗi.")
+
 # ========================================================
 # CÁC CLASS ĐỊNH NGHĨA DỮ LIỆU
 # ========================================================
@@ -82,8 +98,21 @@ class SSOVerifyOTP(BaseModel):
     email: str
     otp: str
 
+class UpdateProfileRequest(BaseModel):
+    full_name: str = None
+    dob: str = None
+    phone: str = None
+    address: str = None
+
+class ChangeEmailRequest(BaseModel):
+    new_email: str
+
+class VerifyChangeEmailRequest(BaseModel):
+    new_email: str
+    otp: str
+
 # ========================================================
-# 1. ĐĂNG NHẬP ADMIN (Giữ nguyên cấu hình cũ)
+# 1. ĐĂNG NHẬP ADMIN
 # ========================================================
 @router.post("/login")
 async def login(request: LoginRequest):
@@ -128,14 +157,21 @@ async def register_sso(data: SSORegisterRequest):
 @router.post("/sso/verify")
 async def verify_otp(data: SSOVerifyOTP):
     cursor = db_manager.connection.cursor()
-    cursor.execute("SELECT id FROM users WHERE email=%s AND otp_code=%s AND is_verified=FALSE", (data.email, data.otp))
+    cursor.execute("SELECT id, otp_code FROM users WHERE email=%s AND is_verified=FALSE", (data.email,))
     user = cursor.fetchone()
     
     if not user:
-        raise HTTPException(status_code=400, detail="OTP không hợp lệ hoặc tài khoản đã xác thực!")
-        
+        raise HTTPException(status_code=400, detail="Tài khoản không tồn tại hoặc đã xác thực!")
+    
+    # Tương thích DictCursor và Tuple
+    db_otp = user['otp_code'] if isinstance(user, dict) else user[1]
+    user_id = user['id'] if isinstance(user, dict) else user[0]
+
+    if db_otp != data.otp:
+        raise HTTPException(status_code=400, detail="OTP không hợp lệ!")
+    
     # Kích hoạt tài khoản người dùng
-    cursor.execute("UPDATE users SET is_verified=TRUE, otp_code=NULL WHERE id=%s", (user[0],))
+    cursor.execute("UPDATE users SET is_verified=TRUE, otp_code=NULL WHERE id=%s", (user_id,))
     db_manager.connection.commit()
     
     return {"status": "success", "message": "Xác thực định danh thành công."}
@@ -152,14 +188,131 @@ async def sso_login(data: LoginRequest):
     
     if not user:
         raise HTTPException(status_code=401, detail="Sai thông tin đăng nhập!")
-    if not user[2]:  # is_verified == FALSE
+        
+    # Tương thích DictCursor và Tuple
+    is_verified = user['is_verified'] if isinstance(user, dict) else user[2]
+    username = user['username'] if isinstance(user, dict) else user[1]
+    user_id = user['id'] if isinstance(user, dict) else user[0]
+    
+    if not is_verified:  
         raise HTTPException(status_code=403, detail="Tài khoản chưa được xác thực Email!")
         
-    # Tạo Token định danh dùng chung cho toàn hệ sinh thái
-    access_token = create_access_token(data={"sub": user[1], "role": "user", "id": user[0]})
+    # Tạo Token định danh dùng chung
+    access_token = create_access_token(data={"sub": username, "role": "user", "id": user_id})
     
     return {
         "status": "success", 
         "message": "Đăng nhập thành công!",
         "access_token": access_token
     }
+
+# ========================================================
+# 5. LẤY THÔNG TIN PROFILE HIỆN TẠI
+# ========================================================
+@router.get("/profile/me")
+async def get_my_profile(auth_data: tuple = Depends(get_current_user_id)):
+    user_id, username = auth_data
+    cursor = db_manager.connection.cursor()
+    cursor.execute("SELECT id, username, full_name, email, phone, dob, address, avatar_url FROM users WHERE id=%s", (user_id,))
+    user = cursor.fetchone()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Không tìm thấy người dùng.")
+        
+    user_dict = user if isinstance(user, dict) else {
+        "id": user[0], "username": user[1], "full_name": user[2], 
+        "email": user[3], "phone": user[4], "dob": user[5], 
+        "address": user[6], "avatar_url": user[7]
+    }
+    
+    # Gắn Avatar mặc định nếu chưa có
+    if not user_dict.get("avatar_url"):
+        user_dict["avatar_url"] = "/src/favicon/ubuntu-backend/favicon-96x96.png"
+        
+    return {"status": "success", "data": user_dict}
+
+# ========================================================
+# 6. CẬP NHẬT THÔNG TIN CƠ BẢN (Không cần OTP)
+# ========================================================
+@router.put("/profile/update")
+async def update_profile(data: UpdateProfileRequest, auth_data: tuple = Depends(get_current_user_id)):
+    user_id, _ = auth_data
+    cursor = db_manager.connection.cursor()
+    cursor.execute("""
+        UPDATE users SET full_name=%s, dob=%s, phone=%s, address=%s WHERE id=%s
+    """, (data.full_name, data.dob, data.phone, data.address, user_id))
+    db_manager.connection.commit()
+    return {"status": "success", "message": "Đã lưu thông tin hồ sơ."}
+
+# ========================================================
+# 7. UPLOAD ẢNH ĐẠI DIỆN
+# ========================================================
+@router.post("/profile/avatar")
+async def upload_avatar(file: UploadFile = File(...), auth_data: tuple = Depends(get_current_user_id)):
+    user_id, username = auth_data
+    
+    # Tạo thư mục lưu trữ: public/images/avatar/ten_user/
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    avatar_dir = os.path.join(base_dir, "public", "images", "avatar", username)
+    os.makedirs(avatar_dir, exist_ok=True)
+    
+    # Lưu file
+    file_ext = file.filename.split(".")[-1]
+    filename = f"avatar_{username}.{file_ext}"
+    file_path = os.path.join(avatar_dir, filename)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    avatar_url = f"/images/avatar/{username}/{filename}"
+    
+    # Cập nhật CSDL
+    cursor = db_manager.connection.cursor()
+    cursor.execute("UPDATE users SET avatar_url=%s WHERE id=%s", (avatar_url, user_id))
+    db_manager.connection.commit()
+    
+    return {"status": "success", "message": "Đã cập nhật ảnh đại diện.", "avatar_url": avatar_url}
+
+# ========================================================
+# 8. YÊU CẦU ĐỔI EMAIL (Gửi OTP)
+# ========================================================
+@router.post("/profile/change-email/request")
+async def request_change_email(data: ChangeEmailRequest, auth_data: tuple = Depends(get_current_user_id)):
+    user_id, username = auth_data
+    cursor = db_manager.connection.cursor()
+    
+    # Kiểm tra email đã có người dùng chưa
+    cursor.execute("SELECT id FROM users WHERE email=%s", (data.new_email,))
+    if cursor.fetchone():
+        raise HTTPException(status_code=400, detail="Email này đã được sử dụng bởi người khác!")
+        
+    otp_code = ''.join(random.choices(string.digits, k=6))
+    if not send_otp_email(data.new_email, otp_code, username):
+        raise HTTPException(status_code=500, detail="Lỗi máy chủ khi gửi Email.")
+        
+    # Lưu tạm mã OTP vào DB
+    cursor.execute("UPDATE users SET otp_code=%s WHERE id=%s", (otp_code, user_id))
+    db_manager.connection.commit()
+    
+    return {"status": "success", "message": "Đã gửi mã OTP đến Email mới."}
+
+# ========================================================
+# 9. XÁC NHẬN ĐỔI EMAIL
+# ========================================================
+@router.post("/profile/change-email/verify")
+async def verify_change_email(data: VerifyChangeEmailRequest, auth_data: tuple = Depends(get_current_user_id)):
+    user_id, _ = auth_data
+    cursor = db_manager.connection.cursor()
+    
+    cursor.execute("SELECT otp_code FROM users WHERE id=%s", (user_id,))
+    user = cursor.fetchone()
+    
+    db_otp = user['otp_code'] if isinstance(user, dict) else user[0]
+    
+    if not db_otp or db_otp != data.otp:
+        raise HTTPException(status_code=400, detail="Mã OTP không chính xác.")
+        
+    cursor.execute("UPDATE users SET email=%s, otp_code=NULL WHERE id=%s", (data.new_email, user_id))
+    db_manager.connection.commit()
+    
+    return {"status": "success", "message": "Đổi Email thành công!"}
