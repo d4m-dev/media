@@ -127,6 +127,13 @@ async def serve_hub():
     if os.path.exists(hub_path): return FileResponse(hub_path)
     return {"status": "error", "message": "Không tìm thấy hub.html"}
 
+# 🚀 ĐÃ BỔ SUNG: Mở luồng truy cập cho Cổng Đăng Nhập SSO
+@app.get("/auth.html")
+async def serve_auth():
+    auth_path = os.path.join(PUBLIC_DIR, "auth.html")
+    if os.path.exists(auth_path): return FileResponse(auth_path)
+    return {"status": "error", "message": "Không tìm thấy auth.html"}
+
 @app.get("/admin/dashboard")
 @app.get("/admin/dashboard/")
 async def serve_dashboard():

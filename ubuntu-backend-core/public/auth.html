@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D4M ID | Cổng Định Danh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #0b0f19; font-family: sans-serif; }
+        .glass-panel { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .toast-enter { animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen relative overflow-hidden">
+
+    <div class="absolute inset-0 z-0">
+        <div class="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none transform translate-x-1/3 -translate-y-1/3"></div>
+        <div class="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-600/20 rounded-full blur-[100px] pointer-events-none transform -translate-x-1/3 translate-y-1/3"></div>
+    </div>
+
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3"></div>
+
+    <main class="w-full max-w-md relative z-10 mx-4">
+        <div class="glass-panel p-8 rounded-[2rem] shadow-2xl">
+            
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 mx-auto bg-gradient-to-tr from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/30 mb-4 transform rotate-3">
+                    <i class="fa-solid fa-fingerprint text-3xl text-white transform -rotate-3"></i>
+                </div>
+                <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500" id="authTitle">D4M ID</h2>
+                <p class="text-sm text-gray-400 mt-1" id="authSubtitle">Định danh chung toàn hệ sinh thái</p>
+            </div>
+
+            <form id="loginForm" class="space-y-4" onsubmit="handleUserLogin(event)">
+                <div class="relative">
+                    <i class="fa-solid fa-user absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                    <input type="text" id="loginUsername" required placeholder="Tài khoản hệ thống" class="w-full pl-11 pr-4 py-3.5 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition">
+                </div>
+                <div class="relative">
+                    <i class="fa-solid fa-lock absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500"></i>
+                    <input type="password" id="loginPassword" required placeholder="Mật khẩu bảo mật" class="w-full pl-11 pr-4 py-3.5 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition">
+                </div>
+                <button type="submit" id="btnLoginSubmit" class="w-full py-3.5 mt-4 font-bold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl hover:from-blue-500 hover:to-purple-500 transition shadow-[0_5px_20px_rgba(59,130,246,0.3)] active:scale-95">Đăng Nhập Cổng Chính</button>
+                <p class="text-center text-sm text-gray-400 mt-5 pt-5 border-t border-white/5">Người dùng mới? <a href="#" onclick="switchTab('register')" class="text-blue-400 hover:text-blue-300 font-bold transition">Khởi tạo định danh</a></p>
+            </form>
+
+            <form id="registerForm" class="space-y-3 hidden" onsubmit="handleRegister(event)">
+                <div class="grid grid-cols-2 gap-3">
+                    <input type="text" id="regUsername" required placeholder="Tên đăng nhập" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:border-blue-500 transition">
+                    <input type="password" id="regPassword" required placeholder="Mật khẩu" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:border-blue-500 transition">
+                </div>
+                <input type="text" id="regFullName" required placeholder="Họ và Tên (Hiển thị)" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:border-blue-500 transition">
+                <input type="email" id="regEmail" required placeholder="Địa chỉ Email (Nhận mã OTP)" class="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-500 text-sm focus:border-blue-500 transition">
+                
+                <button id="btnRegSubmit" type="submit" class="w-full py-3.5 mt-4 font-bold text-white bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl hover:from-blue-500 hover:to-purple-500 transition shadow-lg active:scale-95">Tiếp tục & Lấy mã OTP</button>
+                <p class="text-center text-sm text-gray-400 mt-5 pt-5 border-t border-white/5">Đã có tài khoản? <a href="#" onclick="switchTab('login')" class="text-blue-400 hover:text-blue-300 font-bold transition">Quay lại đăng nhập</a></p>
+            </form>
+
+            <form id="otpForm" class="space-y-4 hidden" onsubmit="handleVerifyOTP(event)">
+                <div class="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl text-center mb-4">
+                    <i class="fa-regular fa-envelope-open text-blue-400 text-2xl mb-2"></i>
+                    <p class="text-sm text-blue-200">Một mã xác thực gồm 6 số đã được gửi tới Email của bạn.</p>
+                </div>
+                <input type="text" id="otpCode" required placeholder="NHẬP MÃ OTP" class="w-full px-4 py-4 bg-black/40 border border-white/10 rounded-xl text-white placeholder-gray-600 text-center text-2xl tracking-[0.5em] focus:border-green-500 transition uppercase font-mono">
+                <button id="btnOtpSubmit" type="submit" class="w-full py-3.5 mt-2 font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl hover:from-green-500 hover:to-emerald-500 transition shadow-lg active:scale-95">Xác Thực & Kích Hoạt</button>
+            </form>
+
+        </div>
+    </main>
+
+    <script>
+        const forms = { login: document.getElementById('loginForm'), register: document.getElementById('registerForm'), otp: document.getElementById('otpForm') };
+        const titles = { login: "D4M ID", register: "Tạo Định Danh", otp: "Xác Minh Bảo Mật" };
+        let tempEmail = "";
+
+        // Hàm hiển thị Toast siêu đẹp
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const icon = type === 'success' ? '<i class="fa-solid fa-circle-check text-green-400"></i>' : '<i class="fa-solid fa-circle-exclamation text-red-400"></i>';
+            const border = type === 'success' ? 'border-green-500/30' : 'border-red-500/30';
+            
+            toast.className = `glass-panel flex items-center gap-3 px-5 py-3.5 rounded-xl border ${border} shadow-xl toast-enter min-w-[250px]`;
+            toast.innerHTML = `${icon} <span class="text-white text-sm font-medium">${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function switchTab(tab) {
+            Object.values(forms).forEach(f => f.classList.add('hidden'));
+            forms[tab].classList.remove('hidden');
+            document.getElementById('authTitle').innerText = titles[tab];
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnRegSubmit');
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xử lý...';
+            btn.disabled = true;
+
+            const payload = {
+                username: document.getElementById('regUsername').value,
+                password: document.getElementById('regPassword').value,
+                full_name: document.getElementById('regFullName').value,
+                email: document.getElementById('regEmail').value
+            };
+            tempEmail = payload.email;
+
+            try {
+                const res = await fetch('/api/auth/sso/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showToast("Đăng ký thành công! Vui lòng kiểm tra Email.");
+                    switchTab('otp');
+                } else showToast(data.detail, 'error');
+            } catch (err) { showToast("Lỗi kết nối máy chủ!", 'error'); }
+            
+            btn.innerHTML = 'Tiếp tục & Lấy mã OTP';
+            btn.disabled = false;
+        }
+
+        async function handleVerifyOTP(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnOtpSubmit');
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang xác thực...';
+            const payload = { email: tempEmail, otp: document.getElementById('otpCode').value };
+
+            try {
+                const res = await fetch('/api/auth/sso/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    showToast("Xác thực Email thành công!");
+                    setTimeout(() => switchTab('login'), 1000);
+                } else showToast("Mã OTP không chính xác hoặc đã hết hạn.", 'error');
+            } catch (err) { showToast("Lỗi kết nối máy chủ!", 'error'); }
+            
+            btn.innerHTML = 'Xác Thực & Kích Hoạt';
+        }
+
+        async function handleUserLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btnLoginSubmit');
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Đang truy cập...';
+            const payload = {
+                username: document.getElementById('loginUsername').value,
+                password: document.getElementById('loginPassword').value
+            };
+
+            try {
+                const res = await fetch('/api/auth/sso/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    localStorage.setItem('d4m_sso_token', data.access_token);
+                    
+                    // 🚀 THUẬT TOÁN ĐIỀU HƯỚNG THÔNG MINH
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const redirectUrl = urlParams.get('redirect') || '/hub.html';
+                    
+                    // Nối thêm cờ báo hiệu đăng nhập thành công để trang đích hiện Toast
+                    const finalUrl = redirectUrl + (redirectUrl.includes('?') ? '&' : '?') + 'login=success';
+                    window.location.href = finalUrl;
+                    
+                } else {
+                    showToast(data.detail, 'error');
+                    btn.innerHTML = 'Đăng Nhập Cổng Chính';
+                }
+            } catch (err) { 
+                showToast("Lỗi kết nối máy chủ!", 'error'); 
+                btn.innerHTML = 'Đăng Nhập Cổng Chính';
+            }
+        }
+    </script>
+</body>
+</html>

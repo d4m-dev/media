@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glass Town - Vùng Đất Nông Trại</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #0b0f19; font-family: sans-serif; }
+        .glass-panel { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+    </style>
+</head>
+<body class="text-white antialiased">
+
+    <div id="sso-screen" class="fixed inset-0 bg-[#0b0f19] z-50 flex flex-col items-center justify-center">
+        <i class="fa-solid fa-fingerprint text-5xl text-blue-500 animate-pulse mb-4"></i>
+        <p class="text-gray-400 text-sm font-mono tracking-widest">D4M ID SECURE CHECKING...</p>
+    </div>
+
+    <div id="game-viewport" class="w-full h-full"></div>
+
+    <div id="game-ui" class="absolute inset-0 pointer-events-none hidden">
+        
+        <div class="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-auto">
+            <div class="glass-panel px-5 py-2 rounded-full flex items-center space-x-3 shadow-lg">
+                <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-400/30">
+                    <i class="fa-solid fa-user text-blue-400 text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-400 font-bold">Nông dân</p>
+                    <p id="ui-username" class="text-sm font-black text-white tracking-wide">Đang nạp...</p>
+                </div>
+            </div>
+
+            <a href="/" class="glass-panel p-3 rounded-full text-gray-400 hover:text-red-400 hover:border-red-500/30 transition shadow-lg flex items-center justify-center">
+                <i class="fa-solid fa-house-user text-lg"></i>
+            </a>
+        </div>
+
+        <div class="absolute bottom-4 left-4 glass-panel p-3 rounded-2xl flex items-center shadow-lg w-80 pointer-events-auto">
+            <input type="text" id="game-chat-input" class="w-full bg-transparent text-white outline-none placeholder-gray-500 px-2 text-sm" placeholder="Trò chuyện với hàng xóm...">
+            <button class="ml-2 text-blue-400 font-black px-4 py-1.5 bg-white/5 rounded-xl hover:bg-white/10 transition text-xs border border-white/5">Gửi</button>
+        </div>
+    </div>
+
+    <script>
+        // ========================================================
+        // 🔮 KIỂM TRA ĐỊNH DANH SSO TOÀN CỤC
+        // ========================================================
+        document.addEventListener("DOMContentLoaded", () => {
+            const token = localStorage.getItem('d4m_sso_token');
+            
+            if (!token) {
+                alert("⚠️ Sếp chưa đăng nhập! Hệ thống sẽ chuyển hướng về trang Hub để xác thực D4M ID.");
+                window.location.href = '/hub.html';
+                return;
+            }
+
+            // Giải mã nhanh token để lấy tên hiển thị (JWT structure)
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                
+                const userData = JSON.parse(jsonPayload);
+                document.getElementById('ui-username').innerText = userData.sub;
+            } catch(e) {
+                document.getElementById('ui-username').innerText = "Thành viên D4M";
+            }
+
+            // Đạt điều kiện -> Tắt màn hình chờ, bật UI game
+            document.getElementById('sso-screen').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            // Khởi động động cơ Phaser 3
+            initGameEngine();
+        });
+
+        // ========================================================
+        // 🎮 ENGINE GAME MULTIPLAYER & FARMING
+        // ========================================================
+        function initGameEngine() {
+            const config = {
+                type: Phaser.AUTO,
+                parent: 'game-viewport',
+                width: window.innerWidth,
+                height: window.innerHeight,
+                pixelArt: true,
+                scene: { preload: preload, create: create, update: update }
+            };
+
+            const game = new Phaser.Game(config);
+
+            function preload() {
+                // Tải ảnh tài nguyên mẫu từ máy chủ
+                this.load.image('sky_bg', 'https://labs.phaser.io/assets/skies/space3.png');
+            }
+
+            function create() {
+                // Tạo ảnh nền bầu trời ảo diệu
+                this.add.image(window.innerWidth/2, window.innerHeight/2, 'sky_bg').setDisplaySize(window.innerWidth, window.innerHeight).setAlpha(0.3);
+                
+                // Vẽ chữ thông báo tiến trình nông trại ảo
+                this.add.text(window.innerWidth/2, window.innerHeight/2, '🌱 VÙNG ĐẤT AVATAR FARMING ĐANG KHỞI TẠO...', {
+                    fontFamily: 'sans-serif', fontSize: '20px', fontWeight: '900', color: '#3b82f6'
+                }).setOrigin(0.5);
+            }
+
+            function update() {
+                // Các luồng di chuyển và cập nhật thời gian thực của cây trồng sẽ code tại đây
+            }
+
+            // Tự động căn chỉnh màn hình khi sếp xoay điện thoại hoặc thay đổi kích thước trình duyệt
+            window.addEventListener('resize', () => {
+                game.scale.resize(window.innerWidth, window.innerHeight);
+            });
+        }
+    </script>
+</body>
+</html>
