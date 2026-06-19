@@ -11,3 +11,4 @@ myenv/
 .vscode
 __pycache__/
 phpmyadmin/
+backend-avatar2d/

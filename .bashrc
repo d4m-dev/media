@@ -95,8 +95,8 @@ fi
 if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
     . /etc/bash_completion
 fi
-
-bash /storage/emulated/0/coder/media/ubuntu-backend-core/scripts/auto_start.sh
+# Bỏ # để apply script tự động chạy backend-core 
+# bash /storage/emulated/0/coder/media/ubuntu-backend-core/scripts/auto_start.sh
 
 # ═══════════════════════════════════════════════════════════════════
 #  🔧 ALIAS DỰ ÁN
@@ -107,12 +107,16 @@ alias update='python3 /storage/emulated/0/coder/media/update.py'
 alias rename='python3 /storage/emulated/0/coder/media/rename.py'
 alias track='python3 /storage/emulated/0/coder/media/tracks.py'
 alias server='~/myenv/bin/python3 /storage/emulated/0/coder/media/server.py'
+alias backend='bash /storage/emulated/0/coder/media/ubuntu-backend-core/scripts/auto_start.sh'
+
 alias clean='apt autoremove -y && apt clean && rm -rf ~/.cache/* && echo "✅ Đã dọn dẹp rác hệ thống!"'
 alias troly='unset LD_PRELOAD LD_LIBRARY_PATH && ~/myenv/bin/python3 /sdcard/coder/media/app.py'
 alias runai='~/run_ai.sh'
 alias meta='cd ~/meta && yarn dev'
 alias galleryflow='cd ~/galleryflow && yarn dev'
 alias chatbox='~/myenv/bin/python3 /sdcard/coder/media/Ai-ChatBox/server.py'
+
+
 
 # ═══════════════════════════════════════════════════════════════════
 #  🎯 QUICK CD & MKCD

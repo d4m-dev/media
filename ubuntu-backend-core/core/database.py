@@ -1,9 +1,12 @@
 import sqlite3
 import os
-import pymysql
+import mysql.connector
+from mysql.connector import pooling
 from core.config import settings
 
+# ==========================================
 # --- PHẦN 1: SQLITE CHO ACCESS LOGS ---
+# ==========================================
 DB_PATH = "/storage/emulated/0/coder/media/ubuntu-backend-core/database/logs.db"
 
 def init_db():
@@ -69,54 +72,118 @@ def get_raw_logs(limit=30):
     except Exception:
         return "Không thể đọc Access Logs."
 
-# --- PHẦN 2: MARIADB CHO SOCIAL SERVICES ---
-class MariaDBConnection:
-    def __init__(self):
-        self.connection = None
 
-    def connect(self):
+# ==========================================
+# --- PHẦN 2: MARIADB CHO SOCIAL SERVICES & GAME ---
+# ==========================================
+class DbManager:
+    """Quản lý Connection Pool (Mô phỏng HikariCP của Java)"""
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DbManager, cls).__new__(cls)
+            cls._instance._init_pool()
+        return cls._instance
+
+    def _init_pool(self):
+        self.pool = None
         try:
-            self.connection = pymysql.connect(
-                host=settings.DB_HOST, port=settings.DB_PORT, user=settings.DB_USER,
-                password=settings.DB_PASS, database=settings.DB_NAME, cursorclass=pymysql.cursors.DictCursor
+            self.pool = pooling.MySQLConnectionPool(
+                pool_name="social_hub_pool",
+                pool_size=10,  # Tương đương max_connections
+                pool_reset_session=True,
+                host=settings.DB_HOST,
+                port=int(settings.DB_PORT),
+                database=settings.DB_NAME,
+                user=settings.DB_USER,
+                password=settings.DB_PASS
             )
+            print("✅ DB Connection Pool đã được khởi tạo thành công!")
         except Exception as e:
-            print(f"⚠️ Không thể kết nối MariaDB (Sẽ thử lại sau): {e}")
+            print(f"⚠️ Khởi tạo MariaDB Pool thất bại (Sẽ thử lại sau): {e}")
 
     def get_connection(self):
-        # Đảm bảo connection đang hoạt động, nếu mất kết nối thì tự reconnect
-        if not self.connection or not self.connection.open:
-            self.connect()
-        return self.connection
+        if self.pool:
+            return self.pool.get_connection()
+        # Fallback nếu pool bị rớt
+        self._init_pool()
+        if self.pool:
+            return self.pool.get_connection()
+        raise Exception("Connection pool chưa được khởi tạo hoặc CSDL đang sập!")
 
-    def init_social_tables(self):
-        conn = self.get_connection()
-        if not conn: return
+
+class DbExecutor:
+    """Tương đương DbExecutor.java - Chuyên xử lý lệnh SELECT"""
+    def __init__(self):
+        self.db = DbManager()
+
+    def select_as_list_dict(self, sql, params=None):
+        """Đọc data và tự động chuyển thành danh sách Dictionary (Giống selectResultAsListObj)"""
+        conn = None
+        cursor = None
         try:
-            with conn.cursor() as cursor:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS users (
-                        id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(50) UNIQUE NOT NULL,
-                        fullname VARCHAR(100), avatar_url VARCHAR(255) DEFAULT '',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS posts (
-                        id INT AUTO_INCREMENT PRIMARY KEY, user_id INT, content TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                    )
-                """)
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS media (
-                        id INT AUTO_INCREMENT PRIMARY KEY, post_id INT, file_url VARCHAR(255) NOT NULL,
-                        media_type VARCHAR(50) DEFAULT 'image',
-                        FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
-                    )
-                """)
-            conn.commit()
+            conn = self.db.get_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(sql, params or ())
+            return cursor.fetchall()
         except Exception as e:
-            print(f"⚠️ Lỗi khi khởi tạo bảng Social Hub: {e}")
+            print(f"⚠️ DbExecutor EXCEPTION: {e}")
+            return []
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()  # Trả connection lại cho Pool
 
-db_manager = MariaDBConnection()
+
+class DbInserter:
+    """Tương đương DbInserter.java - Chuyên xử lý lệnh INSERT"""
+    def __init__(self):
+        self.db = DbManager()
+
+    def insert(self, sql, params=None):
+        """Thực thi INSERT và trả về ID (Khóa chính) vừa tạo"""
+        conn = None
+        cursor = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, params or ())
+            conn.commit()
+            return cursor.lastrowid
+        except Exception as e:
+            print(f"⚠️ DbInserter EXCEPTION: {e}")
+            if conn: conn.rollback()
+            return None
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+
+
+class DbUpdater:
+    """Tương đương DbUpdater.java - Chuyên xử lý lệnh UPDATE / DELETE"""
+    def __init__(self):
+        self.db = DbManager()
+
+    def update(self, sql, params=None):
+        """Thực thi và trả về số dòng bị ảnh hưởng trong Database"""
+        conn = None
+        cursor = None
+        try:
+            conn = self.db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute(sql, params or ())
+            conn.commit()
+            return cursor.rowcount
+        except Exception as e:
+            print(f"⚠️ DbUpdater EXCEPTION: {e}")
+            if conn: conn.rollback()
+            return -1
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+
+# Khởi tạo sẵn các Instance để các file khác import dùng ngay lập tức
+db_manager = DbManager()
+db_executor = DbExecutor()
+db_inserter = DbInserter()
+db_updater = DbUpdater()
