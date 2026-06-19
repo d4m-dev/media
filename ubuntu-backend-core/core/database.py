@@ -103,6 +103,70 @@ class DbManager:
         except Exception as e:
             print(f"⚠️ Khởi tạo MariaDB Pool thất bại (Sẽ thử lại sau): {e}")
 
+    def connect(self):
+        """Hàm được gọi từ api/server.py để khởi chạy/kiểm tra pool kết nối"""
+        if self.pool is None:
+            self._init_pool()
+        else:
+            try:
+                conn = self.pool.get_connection()
+                conn.close()
+                print("✅ MariaDB Connection Pool hoạt động bình thường!")
+            except Exception as e:
+                print(f"⚠️ Cảnh báo kết nối Pool: {e}")
+                self._init_pool()
+
+    def init_social_tables(self):
+        """Khởi tạo cấu trúc các bảng cho mạng xã hội nếu chưa tồn tại"""
+        conn = None
+        cursor = None
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            # 1. Tạo bảng user
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    username VARCHAR(100) NOT NULL UNIQUE,
+                    password_hash VARCHAR(255) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # 2. Tạo bảng post
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS post (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id INT NOT NULL,
+                    content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            # 3. Tạo bảng media
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS media (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    post_id INT NOT NULL,
+                    file_path VARCHAR(255) NOT NULL,
+                    media_type VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (post_id) REFERENCES post(id) ON DELETE CASCADE
+                )
+            ''')
+            
+            conn.commit()
+            print("✅ Đã kiểm tra và khởi tạo thành công các bảng: user, post, media!")
+            
+        except Exception as e:
+            print(f"⚠️ Lỗi khi khởi tạo bảng Social: {e}")
+            if conn: conn.rollback()
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+
     def get_connection(self):
         if self.pool:
             return self.pool.get_connection()

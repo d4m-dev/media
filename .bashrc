@@ -108,6 +108,7 @@ alias rename='python3 /storage/emulated/0/coder/media/rename.py'
 alias track='python3 /storage/emulated/0/coder/media/tracks.py'
 alias server='~/myenv/bin/python3 /storage/emulated/0/coder/media/server.py'
 alias backend='bash /storage/emulated/0/coder/media/ubuntu-backend-core/scripts/auto_start.sh'
+alias avatar='java -jar ~/avatar-server/target/Avatar2D-1.0-SNAPSHOT.jar'
 
 alias clean='apt autoremove -y && apt clean && rm -rf ~/.cache/* && echo "✅ Đã dọn dẹp rác hệ thống!"'
 alias troly='unset LD_PRELOAD LD_LIBRARY_PATH && ~/myenv/bin/python3 /sdcard/coder/media/app.py'
