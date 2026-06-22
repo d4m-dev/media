@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Avatar 2D | Đăng nhập</title>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/index.css" />
+  <script src="./assets/js/index.js" defer></script>
+</head>
+<body>
+  <div class="container" role="main" aria-label="Form tài khoản">
+
+    <!-- Form Đăng nhập -->
+    <form id="loginForm">
+      <div class="row">
+        <label for="username">Tài khoản:</label>
+        <input id="username" type="text" required />
+      </div>
+      <div class="row">
+        <label for="password">Mật khẩu:</label>
+        <input id="password" type="password" required />
+      </div>
+      <div class="checkbox-row">
+        <input id="remember" type="checkbox" />
+        <label for="remember">Nhớ mật khẩu</label>
+      </div>
+      <div style="text-align:center;">
+        <button type="submit">Đăng nhập</button>
+      </div>
+    </form>
+
+    <!-- 🔽 Nút chuyển chế độ → Đăng ký -->
+    <div style="text-align:center; margin:1rem 0;">
+      <button id="toggleMode" type="button">→ Nếu chưa có tài khoản, đăng ký</button>
+    </div>
+
+    <!-- Form Đăng ký -->
+    <form id="registerForm" style="display:none;">
+      <div class="row">
+        <label for="newUsername">Tài khoản mới:</label>
+        <input id="newUsername" type="text" required />
+      </div>
+      <div class="row">
+        <label for="newPassword">Mật khẩu:</label>
+        <input id="newPassword" type="password" required />
+      </div>
+      <div style="text-align:center;">
+        <button type="submit">Bắt đầu chơi</button>
+      </div>
+    </form>
+
+    <!-- Thông báo phản hồi -->
+    <div id="message" style="margin-top:1.5rem;text-align:center;"></div>
+    <div class="hotline">Hotline: 19006610</div>
+  </div>
+</body>
+</html>

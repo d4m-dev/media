@@ -1,0 +1,47 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Arial', sans-serif;
+}
+.map-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+#city-map {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+}
+.map-zone {
+  position: absolute;
+  border: 2px dashed transparent;
+  cursor: pointer;
+}
+.map-zone:hover {
+  border: 2px dashed yellow;
+}
+.zone-popup {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.8);
+  color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  text-align: center;
+  width: 400px;
+  z-index: 10;
+}
+
+/* Định vị mẫu – bạn chỉnh lại cho khớp với bản đồ */
+#zone-home     { top: 15%; left: 10%; width: 12%; height: 18%; }
+#zone-park     { top: 30%; left: 35%; width: 15%; height: 20%; }
+#zone-fun      { top: 50%; left: 65%; width: 15%; height: 20%; }
+#zone-suburb   { top: 75%; left: 10%; width: 18%; height: 20%; }
+#zone-farm     { top: 60%; left: 30%; width: 15%; height: 18%; }
+#zone-fishing  { top: 80%; left: 60%; width: 18%; height: 20%; }
+#zone-airport  { top: 10%; left: 75%; width: 15%; height: 20%; }
+#zone-shop     { top: 40%; left: 80%; width: 12%; height: 20%; }
