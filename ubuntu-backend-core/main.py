@@ -3,7 +3,7 @@ import sys
 import uvicorn
 import subprocess
 import atexit
-import time # 🚀 Thêm thư viện đếm thời gian
+import time
 
 # Ép hệ thống nhận diện thư mục gốc để không bị lỗi không tìm thấy module
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -12,6 +12,10 @@ if BASE_DIR not in sys.path:
 
 from api.server import app
 from core.config import settings
+
+# 🚀 TÍCH HỢP MODULE MUSIC VÀO HỆ THỐNG LỚN
+from api.music import router as music_router
+app.include_router(music_router)
 
 # ==========================================
 # 🚀 HỆ THỐNG TỰ ĐỘNG KHỞI CHẠY DỊCH VỤ NGẦM

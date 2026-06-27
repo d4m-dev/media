@@ -13,7 +13,7 @@ from core.config import settings
 from core.database import init_db, db_manager
 from core.scheduler import ai_janitor_task
 
-from api import dashboard, websockets, chatbox, social, auth, widgets, projects, ai_admin, audio_engine, bio_premium, music_hub, telegram_bot, astrology, ytdl
+from api import dashboard, websockets, chatbox, social, auth, widgets, projects, ai_admin, audio_engine, bio_premium, music, telegram_bot, astrology, ytdl
 
 from middlewares.logger_tracker import LoggerTrackerMiddleware
 from middlewares.rate_limit import RateLimitMiddleware
@@ -88,7 +88,7 @@ app.include_router(projects.router)
 app.include_router(ai_admin.router)    
 app.include_router(audio_engine.router)
 app.include_router(bio_premium.router)
-app.include_router(music_hub.router)
+app.include_router(music.router)
 app.include_router(telegram_bot.router)
 app.include_router(astrology.router)
 app.include_router(ytdl.router)
@@ -156,11 +156,11 @@ async def serve_numerology():
     if os.path.exists(numerology_path): return FileResponse(numerology_path)
     return {"status": "error", "message": "Không tìm thấy numerology.html"}
 
-@app.get("/music-test.html")
+@app.get("/vocal-remove.html")
 async def serve_music_test():
-    music_test_path = os.path.join(PUBLIC_DIR, "music-test.html")
+    music_test_path = os.path.join(PUBLIC_DIR, "vocal-remove.html")
     if os.path.exists(music_test_path): return FileResponse(music_test_path)
-    return {"status": "error", "message": "Không tìm thấy music-test.html"}
+    return {"status": "error", "message": "Không tìm thấy vocal-remove.html"}
 
 @app.get("/love-sync.html")
 async def serve_love_sync():
@@ -197,3 +197,10 @@ async def serve_profile():
     profile_path = os.path.join(PUBLIC_DIR, "profile.html")
     if os.path.exists(profile_path): return FileResponse(profile_path)
     return {"status": "error", "message": "Không tìm thấy profile.html"}
+
+# 🚀 ĐÃ BỔ SUNG: Định tuyến giao diện cho Web Music Player
+@app.get("/music-player.html")
+async def serve_music_player():
+    player_path = os.path.join(PUBLIC_DIR, "music-player.html")
+    if os.path.exists(player_path): return FileResponse(player_path)
+    return {"status": "error", "message": "Không tìm thấy music-player.html"}
