@@ -20,7 +20,7 @@ def create_backup_zip():
     backup_path = os.path.join("/tmp", backup_filename)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    ignored_folders = {'.git', 'myenv', 'venv', '__pycache__', 'audio_workspace', 'hosted_projects', 'node_modules'}
+    ignored_folders = {'.git', 'myenv', 'venv', '__pycache__', 'audio_workspace', 'hosted_projects', 'node_modules', 'avatar-server', 'logs', }
     
     with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(base_dir):

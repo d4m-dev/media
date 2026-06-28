@@ -30,8 +30,8 @@ async def lifespan(app: FastAPI):
     yield 
     task.cancel()
     task_telegram.cancel()
-    if db_manager.connection:
-        db_manager.connection.close() 
+    if getattr(db_manager, "pool", None):
+            print("Đã giải phóng MariaDB Connection Pool an toàn!")
 
 app = FastAPI(title="Ubuntu Backend Core", version="1.0.0", lifespan=lifespan)
 

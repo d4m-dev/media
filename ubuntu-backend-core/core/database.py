@@ -77,7 +77,7 @@ def get_raw_logs(limit=30):
 # --- PHẦN 2: MARIADB CHO SOCIAL SERVICES & GAME ---
 # ==========================================
 class DbManager:
-    """Quản lý Connection Pool (Mô phỏng HikariCP của Java)"""
+    """Quản lý Connection Pool"""
     _instance = None
 
     def __new__(cls):
@@ -91,7 +91,7 @@ class DbManager:
         try:
             self.pool = pooling.MySQLConnectionPool(
                 pool_name="social_hub_pool",
-                pool_size=10,  # Tương đương max_connections
+                pool_size=10, 
                 pool_reset_session=True,
                 host=settings.DB_HOST,
                 port=int(settings.DB_PORT),
@@ -124,7 +124,6 @@ class DbManager:
             conn = self.get_connection()
             cursor = conn.cursor()
             
-            # 1. Tạo bảng user
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS user (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -134,7 +133,6 @@ class DbManager:
                 )
             ''')
             
-            # 2. Tạo bảng post
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS post (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -145,7 +143,6 @@ class DbManager:
                 )
             ''')
             
-            # 3. Tạo bảng media
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS media (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -170,7 +167,6 @@ class DbManager:
     def get_connection(self):
         if self.pool:
             return self.pool.get_connection()
-        # Fallback nếu pool bị rớt
         self._init_pool()
         if self.pool:
             return self.pool.get_connection()
@@ -178,12 +174,10 @@ class DbManager:
 
 
 class DbExecutor:
-    """Tương đương DbExecutor.java - Chuyên xử lý lệnh SELECT"""
     def __init__(self):
         self.db = DbManager()
 
     def select_as_list_dict(self, sql, params=None):
-        """Đọc data và tự động chuyển thành danh sách Dictionary (Giống selectResultAsListObj)"""
         conn = None
         cursor = None
         try:
@@ -196,16 +190,14 @@ class DbExecutor:
             return []
         finally:
             if cursor: cursor.close()
-            if conn: conn.close()  # Trả connection lại cho Pool
+            if conn: conn.close()
 
 
 class DbInserter:
-    """Tương đương DbInserter.java - Chuyên xử lý lệnh INSERT"""
     def __init__(self):
         self.db = DbManager()
 
     def insert(self, sql, params=None):
-        """Thực thi INSERT và trả về ID (Khóa chính) vừa tạo"""
         conn = None
         cursor = None
         try:
@@ -224,12 +216,10 @@ class DbInserter:
 
 
 class DbUpdater:
-    """Tương đương DbUpdater.java - Chuyên xử lý lệnh UPDATE / DELETE"""
     def __init__(self):
         self.db = DbManager()
 
     def update(self, sql, params=None):
-        """Thực thi và trả về số dòng bị ảnh hưởng trong Database"""
         conn = None
         cursor = None
         try:
@@ -246,7 +236,6 @@ class DbUpdater:
             if cursor: cursor.close()
             if conn: conn.close()
 
-# Khởi tạo sẵn các Instance để các file khác import dùng ngay lập tức
 db_manager = DbManager()
 db_executor = DbExecutor()
 db_inserter = DbInserter()
