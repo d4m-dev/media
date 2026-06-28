@@ -2,4 +2,3 @@ bash /storage/emulated/0/coder/media/ubuntu-backend-core/scripts/auto_start.sh
 
 ~/myenv/bin/python3 my_agent.py
 
-~/myenv/bin/uvicorn main:app --host 0.0.0.0 --port 8000 --reload

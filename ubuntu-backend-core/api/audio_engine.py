@@ -5,7 +5,6 @@ import subprocess
 import asyncio
 import httpx
 from datetime import datetime
-# 🚀 Thêm Request để lấy Header và StreamingResponse để truyền luồng nhạc
 from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -63,6 +62,10 @@ def process_audio_pipeline(file_path: str, clean_name: str, task_id: str, ext: s
     if ext.lower() in video_extensions:
         print(f"🎬 [Audio Engine] Phát hiện Video ({ext}). Đang trích xuất MP3...")
         song_input_dir = os.path.join(base_in_dir, clean_name)
+        
+        # 🛡️ BẢO VỆ CHỐNG LỖI: Bắt buộc tạo thư mục trước khi lưu file convert
+        os.makedirs(song_input_dir, exist_ok=True) 
+        
         mp3_converted_path = os.path.join(song_input_dir, f"{task_id}_converted.mp3")
         try:
             cmd_convert = f"ffmpeg -y -i '{file_path}' -q:a 0 -map a '{mp3_converted_path}'"
@@ -136,6 +139,7 @@ def process_audio_pipeline(file_path: str, clean_name: str, task_id: str, ext: s
 
 @router.post("/extract")
 async def extract_audio_features(background_tasks: BackgroundTasks, file: UploadFile = File(...), custom_name: str = Form(None), separate_beat: bool = Form(True), extract_lyrics: bool = Form(True)):
+    # Luồng API này phục vụ cho upload file lẻ, sếp cứ giữ nguyên
     try:
         original_clean, ext = sanitize_folder_name(file.filename)
         final_name = custom_name.strip() if custom_name and custom_name.strip() else original_clean
@@ -154,12 +158,7 @@ async def extract_audio_features(background_tasks: BackgroundTasks, file: Upload
         return JSONResponse(status_code=202, content={
             "status": "processing",
             "message": f"Đang xử lý ngầm: '{task_id}'",
-            "project_folder": f"{clean_name}/{task_id}",
-            "expected_outputs": {
-                "vocal": f"/audio-files/{clean_name}/{task_id}_vocal.mp3" if separate_beat else None,
-                "beat": f"/audio-files/{clean_name}/{task_id}_beat.mp3" if separate_beat else None,
-                "lyrics": f"/audio-files/{clean_name}/{task_id}_lyrics.lrc" if extract_lyrics else None
-            }
+            "project_folder": f"{clean_name}/{task_id}"
         })
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Lỗi: {str(error)}")
@@ -171,10 +170,9 @@ async def check_audio_status(song_name: str, task_id: str):
     return {"status": "processing"}
 
 # ==========================================
-# 🚀 NÂNG CẤP MỚI: TÍNH NĂNG STREAMING NHẠC (CHUNKED)
+# CÁC API STREAMING VÀ LỜI BÀI HÁT ĐƯỢC GIỮ NGUYÊN BÊN DƯỚI
 # ==========================================
 def chunked_file_reader(file_path: str, start: int, end: int, chunk_size: int = 1024 * 1024):
-    """Cắt nhỏ file MP3 ra thành từng khối 1MB để gửi dần về trình duyệt"""
     with open(file_path, "rb") as f:
         f.seek(start)
         while (pos := f.tell()) <= end:
@@ -183,13 +181,7 @@ def chunked_file_reader(file_path: str, start: int, end: int, chunk_size: int = 
 
 @router.get("/stream/{project_name}/{file_name}")
 async def stream_audio(project_name: str, file_name: str, request: Request):
-    """
-    API Stream Nhạc siêu tốc: Trình duyệt yêu cầu đoạn nào, Server trả về đoạn đó.
-    Truy xuất thẳng vào thư mục OUTPUT (nơi chứa kết quả bóc tách).
-    """
     file_path = os.path.join(OUTPUT_DIR, project_name, file_name)
-    
-    # Fallback: Nếu không tìm thấy ở Output, tìm thử bản gốc ở Input
     if not os.path.exists(file_path):
         file_path = os.path.join(INPUT_DIR, project_name, file_name)
         if not os.path.exists(file_path):
@@ -203,69 +195,36 @@ async def stream_audio(project_name: str, file_name: str, request: Request):
         start = int(match.group(1))
         end = int(match.group(2)) if match.group(2) else file_size - 1
         
-        status_code = 206 # Partial Content
+        status_code = 206
         headers = {
             "Content-Range": f"bytes {start}-{end}/{file_size}",
             "Accept-Ranges": "bytes",
             "Content-Length": str(end - start + 1),
             "Content-Type": "audio/mpeg",
         }
-        return StreamingResponse(
-            chunked_file_reader(file_path, start, end),
-            status_code=status_code,
-            headers=headers
-        )
+        return StreamingResponse(chunked_file_reader(file_path, start, end), status_code=status_code, headers=headers)
     
-    headers = {
-        "Accept-Ranges": "bytes",
-        "Content-Length": str(file_size),
-        "Content-Type": "audio/mpeg",
-    }
-    return StreamingResponse(
-        chunked_file_reader(file_path, 0, file_size - 1),
-        headers=headers
-    )
+    headers = {"Accept-Ranges": "bytes", "Content-Length": str(file_size), "Content-Type": "audio/mpeg"}
+    return StreamingResponse(chunked_file_reader(file_path, 0, file_size - 1), headers=headers)
 
-# ==========================================
-# 🚀 NÂNG CẤP MỚI: TÍNH NĂNG ĐỒNG BỘ LỜI BÀI HÁT (JSON)
-# ==========================================
 @router.get("/lyrics/{project_name}/{file_name}")
 async def get_lyrics(project_name: str, file_name: str):
-    """
-    API Đọc file .lrc và biến đổi định dạng thời gian thành Mili-giây (JSON) cho Frontend.
-    """
     lrc_path = os.path.join(OUTPUT_DIR, project_name, file_name)
-    
     if not os.path.exists(lrc_path):
         return {"status": "error", "message": "Bài hát này chưa được bóc tách lời hoặc sai tên file."}
 
     lyrics_data = []
-    
     try:
         with open(lrc_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
             
         for line in lines:
-            # Dùng Regex để bắt mẫu thời gian: [01:12.45] hoặc [01:12.456]
             match = re.search(r'\[(\d{2}):(\d{2}\.\d{2,3})\](.*)', line)
             if match:
-                mins = int(match.group(1))
-                secs = float(match.group(2))
-                text = match.group(3).strip()
-                
-                # Bỏ qua các dòng trống không có chữ
+                mins, secs, text = int(match.group(1)), float(match.group(2)), match.group(3).strip()
                 if text:
-                    time_ms = int((mins * 60 + secs) * 1000)
-                    lyrics_data.append({
-                        "time": time_ms,
-                        "text": text
-                    })
+                    lyrics_data.append({"time": int((mins * 60 + secs) * 1000), "text": text})
                     
-        return {
-            "status": "success",
-            "project": project_name,
-            "lyrics": lyrics_data
-        }
-        
+        return {"status": "success", "project": project_name, "lyrics": lyrics_data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi khi xử lý file lời: {str(e)}")

@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from core.telegram import telegram_polling_task
 import asyncio
 import os
+from api.music import router as music_router
 
 from core.config import settings
 from core.database import init_db, db_manager
@@ -92,6 +93,7 @@ app.include_router(music.router)
 app.include_router(telegram_bot.router)
 app.include_router(astrology.router)
 app.include_router(ytdl.router)
+
 
 # ==========================================
 # 🚀 TỰ ĐỘNG NHẬN DIỆN ĐƯỜNG DẪN GỐC & TÀI NGUYÊN TĨNH

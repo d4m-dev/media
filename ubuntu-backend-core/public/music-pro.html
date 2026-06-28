@@ -1,462 +1,418 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="auto">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Pro Ultimate Studio | d4m-dev</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
-        
-        body { 
-            background: radial-gradient(circle at 50% 0%, #1a103c, #0b071e);
-            color: white; 
-            min-height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-family: 'Inter', sans-serif; 
-            margin: 0;
-            overflow-x: hidden;
-        }
-        
-        /* Hiệu ứng kính mờ tối thượng */
-        .glass-panel { 
-            background: rgba(255, 255, 255, 0.02); 
-            backdrop-filter: blur(40px); 
-            -webkit-backdrop-filter: blur(40px);
-            border: 1px solid rgba(255, 255, 255, 0.05); 
-            box-shadow: 0 40px 100px rgba(0,0,0,0.8), inset 0 1px 1px rgba(255,255,255,0.05); 
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .glass-card:hover, .song-item.active {
-            background: rgba(233, 69, 96, 0.15);
-            border-color: rgba(233, 69, 96, 0.3);
-            box-shadow: 0 10px 20px rgba(233, 69, 96, 0.1);
-        }
-
-        /* Khung Đĩa Nhạc & Video */
-        .cover-wrapper {
-            position: relative;
-            transition: all 0.5s ease;
-            border-radius: 1.5rem;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .cover-wrapper::after {
-            content: ''; position: absolute; inset: -10px; border-radius: 2rem;
-            background: linear-gradient(135deg, #e94560, #ff7b54); opacity: 0;
-            filter: blur(20px); transition: opacity 0.5s ease; z-index: -1;
-        }
-        .playing .cover-wrapper::after { opacity: 0.4; }
-        .playing .cover-wrapper { transform: scale(1.02); box-shadow: 0 30px 60px rgba(233, 69, 96, 0.4); }
-
-        .cover-art, .video-player {
-            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-            transition: opacity 0.4s ease;
-        }
-
-        /* 🚀 Chế độ Cinema 16:9 khi phát Video */
-        .video-mode .cover-wrapper {
-            width: 100% !important;
-            height: auto !important;
-            aspect-ratio: 16/9;
-            border-radius: 1rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
-        }
-        .video-mode .cover-wrapper::after { opacity: 0; }
-        .video-mode .cover-art { opacity: 0; }
-        .video-mode .video-player { opacity: 1; pointer-events: auto; }
-
-        /* Lời bài hát mượt như nhung */
-        .lyric-box {
-            mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
-            -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
-        }
-        .lyric-line { 
-            transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); 
-            opacity: 0.2; 
-            transform: scale(0.92);
-            padding: 10px 0;
-        }
-        .lyric-active { 
-            opacity: 1; 
-            transform: scale(1.05);
-            color: #fff; 
-            text-shadow: 0 0 25px rgba(255, 255, 255, 0.9), 0 0 10px rgba(233, 69, 96, 0.5); 
-        }
-
-        /* Thanh tua nhạc tinh tế */
-        input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none; height: 12px; width: 12px; border-radius: 50%;
-            background: #e94560; cursor: pointer; margin-top: -4px;
-            box-shadow: 0 0 10px #e94560; transition: transform 0.1s;
-        }
-        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.4); }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%; height: 4px; cursor: pointer; background: rgba(255, 255, 255, 0.1); border-radius: 2px;
-        }
-
-        /* Tùy chỉnh thanh cuộn siêu mỏng Cyberpunk */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #e94560; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Music Pro Ultimate</title>
+    <meta name="theme-color" content="#000000">
+    <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="src/styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
-<body class="p-2 md:p-6 w-full">
+<body>
 
-    <div class="glass-panel w-full max-w-7xl rounded-[3rem] p-6 md:p-8 flex flex-col lg:flex-row gap-8 relative overflow-hidden h-auto lg:h-[750px]" id="playerWrapper">
-        
-        <div class="w-full lg:w-4/12 flex flex-col h-[400px] lg:h-full pr-0 lg:pr-4">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-lg font-black tracking-wider uppercase bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
-                    <i class="fa-solid fa-compact-disc text-[#e94560] mr-2 animate-spin"></i>Studio Library
-                </h3>
-                <span id="trackCount" class="text-xs font-bold px-3 py-1 bg-white/5 border border-white/10 rounded-full text-gray-400">0 Tracks</span>
+    <div id="loader" class="flex-center">
+        <div class="loader-ring"></div>
+        <h3 style="font-weight:700; letter-spacing:1px;">MUSIC PRO</h3>
+    </div>
+
+    <div id="toast"><i class="fa-solid fa-circle-check" style="color:var(--primary)"></i> <span id="toast-msg">Thông báo</span></div>
+
+    <div class="app-layout">
+        <div class="top-bar">
+            <div class="logo"><i class="fa-brands fa-youtube"></i> Music Pro</div>
+            <div class="flex-center" style="gap: 15px;">
+                <div class="avatar" style="width:36px; height:36px; border-radius:50%; overflow:hidden; border:2px solid var(--border);">
+                    <img src="src/favicon/favicon-32x32.png" style="width:100%">
+                </div>
             </div>
-
-            <div class="flex gap-2 mb-4 text-xs font-bold">
-                <button onclick="switchLibraryTab('all')" id="tab-all" class="px-4 py-2 rounded-xl bg-[#e94560] text-white shadow-lg shadow-[#e94560]/20 transition">Tất cả</button>
-                <button onclick="switchLibraryTab('top')" id="tab-top" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition">Nghe Nhiều</button>
-                <button onclick="switchLibraryTab('ai')" id="tab-ai" class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-[#ff7b54]"></i>Gợi ý</button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto space-y-2 pr-1" id="playlistContainer"></div>
         </div>
 
-        <div class="w-full lg:w-4/12 flex flex-col justify-center items-center px-0 lg:px-6 py-6 lg:py-0 border-y lg:border-y-0 lg:border-x border-white/5 relative">
-            
-            <button onclick="toggleSleepTimer()" class="absolute top-0 md:top-4 text-gray-400 hover:text-white transition z-20 flex items-center gap-2 group bg-white/5 px-3 py-1.5 rounded-full border border-white/10">
-                <i class="fa-solid fa-moon text-sm" id="timerIcon"></i>
-                <span id="timerText" class="text-xs font-black text-[#e94560] hidden">30m</span>
-            </button>
-
-            <div class="cover-wrapper w-56 h-56 md:w-72 md:h-72 mb-8 mt-6">
-                <img id="coverArt" src="https://via.placeholder.com/400" class="cover-art z-10" alt="Cover Art">
-                <video id="videoPlayer" class="video-player z-20 opacity-0 pointer-events-none" playsinline ontimeupdate="updateProgress()" onended="nextSong()"></video>
+        <div class="search-wrapper">
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="search-input" placeholder="Tìm tên bài hát, ca sĩ...">
+                <button id="btn-clear-search" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
             </div>
+        </div>
 
-            <div class="text-center w-full max-w-[280px] mb-6">
-                <h2 id="songTitle" class="text-2xl font-black tracking-tight truncate text-white">Đang tải...</h2>
-                <p id="artistName" class="text-xs font-bold text-[#e94560] tracking-widest uppercase mt-1">d4m-dev Studio</p>
+        <div class="chips-wrapper">
+            <div class="chips-row">
+                <span class="chip active" data-type="all">Tất Cả</span>
+                <span class="chip" data-type="remix">Nhạc Remix</span>
+                <span class="chip" data-type="tet">Nhạc Tết</span>
+                <span class="chip" data-type="lofi">Lofi</span>
+                <span class="chip" data-type="favorites">Yêu thích</span>
             </div>
+        </div>
 
-            <div class="w-full mb-6 px-2">
-                <input type="range" id="progressBar" value="0" min="0" max="100" oninput="seekMedia()">
-                <div class="flex justify-between text-[10px] font-bold text-gray-400 mt-2 tracking-wider">
-                    <span id="currentTime">0:00</span>
-                    <span id="totalTime">0:00</span>
+        <div class="list-container" id="main-scroll">
+            <div class="list-header">
+                <div class="header-main">
+                    <h2>Danh sách phát</h2>
+                    <p>Cập nhật hôm nay • Dành riêng cho bạn</p>
+                </div>
+                <div class="sort-controls" id="sort-controls" style="display: none;">
+                    <button class="btn-sort active" data-sort="id" id="sort-by-date">
+                        <i class="fa-solid fa-clock"></i> <span>Mới nhất</span>
+                    </button>
+                    <button class="btn-sort" data-sort="name" id="sort-by-name">
+                        <i class="fa-solid fa-font"></i> <span>Tên A-Z</span>
+                    </button>
+                </div>
+            </div>
+            <div id="track-list"></div>
+            <div style="height: 150px;"></div>
+        </div>
+
+        <div class="mini-player hide" id="mini-player">
+            <div class="progress-line"><div class="progress-fill" id="mini-fill"></div></div>
+            <div class="mini-content" id="mini-click-area">
+                <div class="mini-img-box"><img id="mini-img" src="" alt=""></div>
+                <div class="mini-text-box">
+                    <span class="mini-title" id="mini-title">...</span>
+                    <span class="mini-status" id="mini-artist">...</span>
+                </div>
+                <div class="flex-center" style="gap:5px;">
+                    <button class="btn-icon" id="btn-mini-play"><i class="fa-solid fa-play"></i></button>
+                    <button class="btn-icon" id="btn-mini-next"><i class="fa-solid fa-forward-step"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="player-overlay" id="player-overlay">
+            <div class="ambient-glow" id="ambient-light"></div>
+            <div class="overlay-header">
+                <button class="btn-icon" id="btn-close"><i class="fa-solid fa-chevron-down"></i></button>
+                <div class="tab-switcher">
+                    <div class="tab-btn active" data-tab="song">SONG</div>
+                    <div class="tab-btn" data-tab="video">VIDEO</div>
+                    <div class="tab-btn" data-tab="lyrics">LYRICS</div>
+                </div>
+                <div style="position: relative;">
+                    <button class="btn-icon" id="btn-options"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                    <div class="options-menu" id="options-menu">
+                        <div class="menu-item" id="btn-switch-beat">
+                            <i class="fa-solid fa-microphone-lines"></i>
+                            <span>Chuyển sang Beat</span>
+                            <div class="toggle-switch"></div>
+                        </div>
+                        <div class="menu-item" id="btn-open-timer">
+                            <i class="fa-regular fa-clock"></i>
+                            <span id="timer-menu-text">Hẹn giờ tắt</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="flex justify-center items-center gap-6 w-full">
-                <button onclick="toggleTrackMode()" id="modeBtn" class="text-sm px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition hidden flex flex-col items-center min-w-[65px]">
-                    <i class="fa-solid fa-microphone text-md mb-1 text-green-400" id="modeIcon"></i>
-                    <span class="text-[9px] uppercase font-black tracking-widest" id="modeText">Vocal</span>
-                </button>
-                
-                <button onclick="prevSong()" class="text-xl text-gray-400 hover:text-white transition transform hover:scale-110"><i class="fa-solid fa-backward-step"></i></button>
-                
-                <button onclick="togglePlay()" class="w-16 h-16 bg-white text-black rounded-full shadow-[0_0_30px_rgba(255,255,255,0.2)] flex items-center justify-center text-2xl hover:scale-105 transition transform">
-                    <i class="fa-solid fa-play ml-1" id="playIcon"></i>
-                </button>
-                
-                <button onclick="nextSong()" class="text-xl text-gray-400 hover:text-white transition transform hover:scale-110"><i class="fa-solid fa-forward-step"></i></button>
-                
-                <div class="w-16 opacity-0 hidden" id="spacer"></div>
+            <div class="player-stage">
+                <div class="stage-view active" id="view-song">
+                    <div class="artwork-card"><img id="full-artwork" src="" alt=""></div>
+                </div>
+                <div class="stage-view" id="view-video">
+                    <div class="video-container">
+                        <video id="video-element" playsinline webkit-playsinline></video>
+                        <div class="video-fallback" id="video-msg">
+                            <div class="loader-ring" style="width:30px;height:30px;border-width:3px;"></div>
+                            <span>Đang tải Video...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="stage-view" id="view-lyrics">
+                    <div class="lyrics-container" id="lyrics-content">
+                        <p style="text-align:center; color:var(--text-sub);">Đang tải lời bài hát...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="player-controls">
+                <div class="meta-info">
+                    <div class="song-texts">
+                        <div class="marquee-wrapper" id="marquee-box-title">
+                            <span class="marquee-content text-h1" id="full-title">Title</span>
+                        </div>
+                        <div class="marquee-wrapper" id="marquee-box-artist">
+                            <span class="marquee-content text-h2" id="full-artist">Artist</span>
+                        </div>
+                    </div>
+                    <div class="flex-center" style="gap:10px;">
+                        <button class="btn-icon" id="btn-dl"><i class="fa-solid fa-download"></i></button>
+                        <button class="btn-icon btn-share"><i class="fa-solid fa-share-nodes"></i></button>
+                        <button class="btn-icon" id="btn-heart"><i class="fa-regular fa-heart"></i></button>
+                    </div>
+                </div>
+
+                <div class="slider-group">
+                    <div class="progress-container" style="display:flex; align-items:center; gap:10px;">
+                        <span id="curr-time" style="font-size:12px; color:var(--text-sub); width:40px;">0:00</span>
+                        <input type="range" id="seek-bar" value="0" min="0" max="100" step="0.1">
+                        <span id="total-time" style="font-size:12px; color:var(--text-sub); width:40px;">0:00</span>
+                    </div>
+                </div>
+
+                <div class="controls-row">
+                    <button class="btn-icon" id="btn-shuffle"><i class="fa-solid fa-shuffle"></i></button>
+                    <button class="btn-icon" id="btn-prev" style="font-size:24px;"><i class="fa-solid fa-backward-step"></i></button>
+                    <button class="btn-play-xl" id="btn-main-play"><i class="fa-solid fa-play"></i></button>
+                    <button class="btn-icon" id="btn-next" style="font-size:24px;"><i class="fa-solid fa-forward-step"></i></button>
+                    <button class="btn-icon" id="btn-repeat"><i class="fa-solid fa-repeat"></i></button>
+                </div>
+
+                <div class="vol-wrapper">
+                    <button class="btn-icon" id="btn-mute" style="width:30px; height:30px; font-size:16px;">
+                        <i class="fa-solid fa-volume-high"></i>
+                    </button>
+                    <input type="range" id="vol-bar" min="0" max="1" step="0.05" value="0.8">
+                </div>
             </div>
         </div>
 
-        <div class="w-full lg:w-4/12 h-[300px] lg:h-full flex flex-col pl-0 lg:pl-4">
-            <h3 class="text-xs font-bold text-gray-500 tracking-widest uppercase mb-4 text-center lg:text-left">
-                <i class="fa-solid fa-quote-left mr-2"></i>Live Lyrics Sync
-            </h3>
-            <div class="lyric-box h-full overflow-hidden relative" id="lyricContainer">
-                <div id="lyricWrapper" class="transition-transform duration-500 ease-out flex flex-col items-center lg:items-start text-center lg:text-left mt-24 lg:mt-56 text-lg lg:text-2xl font-bold text-gray-400"></div>
+        <nav class="bottom-nav">
+            <div class="nav-link active"><i class="fa-solid fa-house"></i> <span>Trang chủ</span></div>
+            <div class="nav-link"><i class="fa-solid fa-compass"></i> <span>Khám phá</span></div>
+            <div class="nav-link" id="nav-favorites"><i class="fa-solid fa-heart"></i> <span>Yêu thích</span></div>
+            <div class="nav-link" id="nav-settings"><i class="fa-solid fa-gear"></i> <span>Cài đặt</span></div>
+        </nav>
+        
+        <div id="timer-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h3>Hẹn giờ tắt nhạc</h3>
+                <div class="timer-grid">
+                    <button class="timer-btn" data-time="15">15 Phút</button>
+                    <button class="timer-btn" data-time="30">30 Phút</button>
+                    <button class="timer-btn" data-time="45">45 Phút</button>
+                    <button class="timer-btn" data-time="60">1 Giờ</button>
+                    <button class="timer-btn" data-time="120">2 Giờ</button>
+                    <button class="timer-btn stop" data-time="0" style="color: #ff4757;">Tắt hẹn giờ</button>
+                </div>
+                <button class="btn-close-modal" id="btn-close-timer">Đóng</button>
             </div>
         </div>
+
+        <div id="download-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h3>Tải xuống</h3>
+                <p id="dl-song-title" style="text-align:center; color:var(--text-sub); margin-bottom:20px; font-size:14px;"></p>
+                <div class="download-grid">
+                    <button class="dl-btn" data-type="audio">
+                        <i class="fa-solid fa-music"></i>
+                        <span>Nhạc MP3</span>
+                    </button>
+                    <button class="dl-btn" data-type="beat">
+                        <i class="fa-solid fa-microphone-lines"></i>
+                        <span>Beat / Kara</span>
+                    </button>
+                    <button class="dl-btn" data-type="video">
+                        <i class="fa-solid fa-video"></i>
+                        <span>Video MP4</span>
+                    </button>
+                    <button class="dl-btn" data-type="lyric">
+                        <i class="fa-solid fa-file-lines"></i>
+                        <span>Lời bài hát</span>
+                    </button>
+                </div>
+                <button class="btn-close-modal" id="btn-close-dl">Đóng</button>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h3>Cài Đặt</h3>
+                <div class="settings-container">
+                    <div class="settings-section">
+                        <div class="settings-title">CHUNG</div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-moon"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Chế độ tối</div>
+                                <div class="settings-desc">Chuyển đổi giữa chế độ sáng và tối</div>
+                            </div>
+                            <div class="toggle-switch" id="theme-toggle-switch"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-language"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Ngôn ngữ</div>
+                                <div class="settings-desc">Thay đổi ngôn ngữ hiển thị</div>
+                            </div>
+                            <div class="settings-action">Tiếng Việt</div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-title">ÂM THANH</div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-sliders"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Cân bằng âm thanh</div>
+                                <div class="settings-desc">Điều chỉnh âm trầm và âm bổng</div>
+                            </div>
+                            <div class="settings-action">Mặc định</div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-headphones"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Hiệu ứng âm thanh</div>
+                                <div class="settings-desc">Bật/tắt hiệu ứng âm thanh nâng cao</div>
+                            </div>
+                            <div class="toggle-switch" id="sound-effect-switch"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-title">KHÁC</div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-download"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Tự động cập nhật</div>
+                                <div class="settings-desc">Tự động tải về phiên bản mới nhất</div>
+                            </div>
+                            <div class="toggle-switch" id="auto-update-switch"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-trash"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Xóa bộ nhớ đệm</div>
+                                <div class="settings-desc">Dọn dẹp dữ liệu tạm thời</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-settings">Đóng</button>
+            </div>
+        </div>
+
+        <!-- Reset Confirmation Modal -->
+        <div id="reset-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h3>Xác nhận cài đặt gốc</h3>
+                <div class="reset-warning">
+                    <p style="color:var(--text-sub); text-align:center; margin-bottom:20px; line-height:1.6;">
+                        Bạn có chắc chắn muốn khôi phục cài đặt gốc? Hành động này sẽ:<br><br>
+                        <span style="color:#ff6b6b;">• Xóa tất cả cài đặt cá nhân</span><br>
+                        <span style="color:#ff6b6b;">• Xóa danh sách yêu thích</span><br>
+                        <span style="color:#ff6b6b;">• Xóa lịch sử nghe gần đây</span><br>
+                        <span style="color:#ff6b6b;">• Đặt lại tất cả tùy chọn về mặc định</span><br>
+                        <span style="color:#ff6b6b;">• Không thể hoàn tác sau khi xác nhận</span>
+                    </p>
+                </div>
+                <div style="display:flex; gap:12px;">
+                    <button class="btn-close-modal" id="btn-cancel-reset" style="flex:1; background:rgba(255,255,255,0.05);">Hủy bỏ</button>
+                    <button class="btn-close-modal" id="btn-confirm-reset" style="flex:1; background:var(--primary); color:white; font-weight:700;">Xác nhận</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3D Audio and EQ Modal -->
+        <div id="audio-controls-modal" class="modal-overlay">
+            <div class="modal-content">
+                <h3>Điều Khiển Âm Thanh</h3>
+
+                <!-- Numeric Keypad for Code Entry -->
+                <div id="keypad-container" class="keypad-container">
+                    <div class="keypad-display">
+                        <input type="password" id="code-input" placeholder="Nhập mã" maxlength="4" readonly>
+                    </div>
+                    <div class="keypad-grid">
+                        <button class="keypad-btn" data-key="1">1</button>
+                        <button class="keypad-btn" data-key="2">2</button>
+                        <button class="keypad-btn" data-key="3">3</button>
+                        <button class="keypad-btn" data-key="4">4</button>
+                        <button class="keypad-btn" data-key="5">5</button>
+                        <button class="keypad-btn" data-key="6">6</button>
+                        <button class="keypad-btn" data-key="7">7</button>
+                        <button class="keypad-btn" data-key="8">8</button>
+                        <button class="keypad-btn" data-key="9">9</button>
+                        <button class="keypad-btn" data-key="C">C</button>
+                        <button class="keypad-btn" data-key="0">0</button>
+                        <button class="keypad-btn" data-key="OK">OK</button>
+                    </div>
+                </div>
+
+                <!-- Audio Controls (hidden initially) -->
+                <div id="audio-controls" class="audio-controls" style="display: none;">
+                    <div class="settings-section">
+                        <div class="settings-title">HIỆU ỨNG ÂM THANH 3D</div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-headphones"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Âm thanh vòm 3D</div>
+                                <div class="settings-desc">Tạo hiệu ứng âm thanh không gian</div>
+                            </div>
+                            <div class="toggle-switch" id="spatial-audio-toggle"></div>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-icon"><i class="fa-solid fa-wave-square"></i></div>
+                            <div class="settings-info">
+                                <div class="settings-name">Hiệu ứng âm thanh nâng cao</div>
+                                <div class="settings-desc">Tăng cường trải nghiệm âm thanh</div>
+                            </div>
+                            <div class="toggle-switch" id="enhanced-audio-toggle"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <div class="settings-title">BỘ CHỈNH ÂM (EQ)</div>
+                        <div class="eq-controls">
+                            <div class="eq-slider">
+                                <label>Low (60Hz)</label>
+                                <input type="range" id="eq-low" min="-12" max="12" value="0">
+                                <span id="eq-low-value">0dB</span>
+                            </div>
+                            <div class="eq-slider">
+                                <label>Mid-Low (230Hz)</label>
+                                <input type="range" id="eq-mid-low" min="-12" max="12" value="0">
+                                <span id="eq-mid-low-value">0dB</span>
+                            </div>
+                            <div class="eq-slider">
+                                <label>Mid (910Hz)</label>
+                                <input type="range" id="eq-mid" min="-12" max="12" value="0">
+                                <span id="eq-mid-value">0dB</span>
+                            </div>
+                            <div class="eq-slider">
+                                <label>Mid-High (3.5kHz)</label>
+                                <input type="range" id="eq-mid-high" min="-12" max="12" value="0">
+                                <span id="eq-mid-high-value">0dB</span>
+                            </div>
+                            <div class="eq-slider">
+                                <label>High (14kHz)</label>
+                                <input type="range" id="eq-high" min="-12" max="12" value="0">
+                                <span id="eq-high-value">0dB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="presets-section">
+                        <div class="settings-title">CHẾ ĐỘ ÂM THANH</div>
+                        <div class="preset-buttons">
+                            <button class="preset-btn active" data-preset="flat">Mặc định</button>
+                            <button class="preset-btn" data-preset="rock">Rock</button>
+                            <button class="preset-btn" data-preset="pop">Pop</button>
+                            <button class="preset-btn" data-preset="jazz">Jazz</button>
+                            <button class="preset-btn" data-preset="classical">Cổ điển</button>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-close-modal" id="btn-close-audio-controls">Đóng</button>
+            </div>
+        </div>
+
     </div>
 
-    <audio id="audioPlayer" ontimeupdate="updateProgress()" onended="nextSong()"></audio>
+<script src="src/tracks.js"></script>
+<script src="src/playlists.js"></script>
 
-    <script>
-        let rawPlaylist = []; 
-        let displayPlaylist = []; 
-        let currentIndex = 0;
-        let isPlaying = false;
-        let isBeatMode = false;
-        let lyrics = [];
-        let currentTab = 'all';
+<script src="src/modules/helpers.js"></script>
+<script src="src/modules/ui.js"></script>
+<script src="src/modules/audio.js"></script>
+<script src="src/modules/events.js"></script>
+<script src="src/modules/utils.js"></script>
+<script src="src/modules/lyrics.js"></script>
+<script src="src/modules/other.js"></script>
 
-        const audio = document.getElementById("audioPlayer");
-        const video = document.getElementById("videoPlayer");
-        let activePlayer = audio; 
-
-        const playIcon = document.getElementById("playIcon");
-        const playerWrapper = document.getElementById("playerWrapper");
-        const coverArt = document.getElementById("coverArt");
-        const modeBtn = document.getElementById("modeBtn");
-        const modeIcon = document.getElementById("modeIcon");
-        const modeText = document.getElementById("modeText");
-        const progressBar = document.getElementById("progressBar");
-
-        // Tự động lùi về file Âm thanh nếu Video bị lỗi hoặc không stream được
-        video.onerror = function() {
-            if (activePlayer === video && !isBeatMode) {
-                console.warn("Lỗi tải Video, tự động chuyển về âm thanh.");
-                const song = rawPlaylist[currentIndex];
-                playerWrapper.classList.remove("video-mode");
-                activePlayer = audio;
-                
-                if (song.flags.vocal) {
-                    audio.src = `/api/music/stream/${song.id}/2.mp3`;
-                    if (isPlaying) audio.play();
-                }
-            }
-        };
-
-        function getAnalyticsData() { return JSON.parse(localStorage.getItem('d4m_music_analytics') || '{}'); }
-        function trackListenEvent(songId) {
-            let data = getAnalyticsData();
-            data[songId] = (data[songId] || 0) + 1;
-            localStorage.setItem('d4m_music_analytics', JSON.stringify(data));
-            if(currentTab !== 'all') renderPlaylist();
-        }
-
-        async function initApp() {
-            try {
-                const res = await fetch('/api/music/list');
-                const data = await res.json();
-                if(data.status === 'success' && data.songs.length > 0) {
-                    rawPlaylist = data.songs;
-                    document.getElementById("trackCount").innerText = `${rawPlaylist.length} Tracks`;
-                    switchLibraryTab('all');
-                    loadSong(0, false);
-                } else {
-                    document.getElementById("songTitle").innerText = "Kho nhạc rỗng!";
-                }
-            } catch (e) { console.error("Lỗi API Music: ", e); }
-        }
-
-        function switchLibraryTab(tabName) {
-            currentTab = tabName;
-            ['all', 'top', 'ai'].forEach(t => {
-                document.getElementById(`tab-${t}`).className = t === tabName 
-                    ? "px-4 py-2 rounded-xl bg-[#e94560] text-white shadow-lg shadow-[#e94560]/20 transition" 
-                    : "px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition";
-            });
-            renderPlaylist();
-        }
-
-        function renderPlaylist() {
-            const container = document.getElementById("playlistContainer");
-            container.innerHTML = "";
-            let analytics = getAnalyticsData();
-
-            displayPlaylist = [...rawPlaylist];
-            if (currentTab === 'top') displayPlaylist.sort((a, b) => (analytics[b.id] || 0) - (analytics[a.id] || 0));
-            else if (currentTab === 'ai') displayPlaylist.sort((a, b) => (analytics[a.id] || 0) - (analytics[b.id] || 0));
-
-            displayPlaylist.forEach(song => {
-                const isActive = rawPlaylist[currentIndex] && rawPlaylist[currentIndex].id === song.id;
-                const div = document.createElement("div");
-                div.className = `song-item glass-card p-3 rounded-2xl flex items-center gap-3 cursor-pointer text-left ${isActive ? 'active' : ''}`;
-                div.onclick = () => loadSong(rawPlaylist.findIndex(s => s.id === song.id), true);
-
-                div.innerHTML = `
-                    <img src="${song.cover_api}?t=${song.id}" class="w-10 h-10 object-cover rounded-xl bg-black/50">
-                    <div class="flex-1 truncate">
-                        <h4 class="text-sm font-bold truncate text-white">${song.title}</h4>
-                        <p class="text-[11px] text-gray-400 truncate font-medium">${song.artist || 'd4m-dev Studio'}</p>
-                    </div>
-                    <div class="flex gap-1 flex-col items-end justify-center">
-                        ${song.flags.video ? '<i class="fa-solid fa-video text-[10px] text-pink-400"></i>' : ''}
-                        <div class="text-right text-[10px] font-bold text-gray-500"><i class="fa-solid fa-headphones mr-1"></i>${analytics[song.id] || 0}</div>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-
-        async function loadSong(index, autoPlay = true) {
-            audio.pause(); video.pause();
-            currentIndex = index;
-            const song = rawPlaylist[currentIndex];
-            if(!song) return;
-
-            document.getElementById("songTitle").innerText = song.title;
-            document.getElementById("artistName").innerText = song.artist || "d4m-dev Studio";
-            coverArt.src = song.cover_api + "?t=" + new Date().getTime();
-            renderPlaylist();
-
-            isBeatMode = false;
-            let hasVocalOption = song.flags.vocal || song.flags.video;
-            
-            // 🚀 BỘ CHIA LOGIC VIDEO / AUDIO (TỰ ĐỘNG BIẾN HÌNH)
-            if (song.flags.video) {
-                activePlayer = video;
-                video.src = `/api/music/stream/${song.id}/4.mp4`;
-                playerWrapper.classList.add("video-mode"); // Biến thành màn hình 16:9
-            } else if (song.flags.vocal) {
-                activePlayer = audio;
-                audio.src = `/api/music/stream/${song.id}/2.mp3`;
-                playerWrapper.classList.remove("video-mode");
-            } else if (song.flags.beat) {
-                activePlayer = audio;
-                audio.src = `/api/music/stream/${song.id}/3.mp3`;
-                playerWrapper.classList.remove("video-mode");
-            }
-
-            if(hasVocalOption && song.flags.beat) {
-                modeBtn.classList.remove("hidden");
-                document.getElementById("spacer").classList.remove("hidden");
-                modeIcon.className = "fa-solid fa-microphone text-md mb-1 text-green-400";
-                modeText.innerText = "Vocal";
-            } else {
-                modeBtn.classList.add("hidden");
-                document.getElementById("spacer").classList.add("hidden");
-            }
-
-            if (autoPlay) trackListenEvent(song.id);
-
-            const wrapper = document.getElementById("lyricWrapper");
-            wrapper.innerHTML = ""; wrapper.style.transform = `translateY(0px)`;
-            lyrics = [];
-
-            if(song.flags.lyrics) {
-                try {
-                    const lrcRes = await fetch(`/api/music/lyrics/${song.id}`);
-                    const lrcData = await lrcRes.json();
-                    if(lrcData.status === 'success') {
-                        lyrics = lrcData.lyrics;
-                        lyrics.forEach((line, i) => {
-                            const p = document.createElement("p");
-                            p.className = "lyric-line"; p.id = "lrc-" + i; p.innerText = line.text;
-                            wrapper.appendChild(p);
-                        });
-                    }
-                } catch(e) {}
-            } else {
-                wrapper.innerHTML = "<p class='lyric-active text-gray-500 text-sm md:text-base'>[ Bản nhạc này không có lời ]</p>";
-            }
-
-            if(autoPlay) { isPlaying = false; togglePlay(); }
-        }
-
-        function toggleTrackMode() {
-            const song = rawPlaylist[currentIndex];
-            const currentTime = activePlayer.currentTime; 
-            
-            activePlayer.pause();
-            isBeatMode = !isBeatMode;
-            
-            if (isBeatMode) {
-                activePlayer = audio;
-                audio.src = `/api/music/stream/${song.id}/3.mp3`;
-                playerWrapper.classList.remove("video-mode");
-                modeIcon.className = "fa-solid fa-microphone-slash text-md mb-1 text-[#e94560]";
-                modeText.innerText = "Beat";
-            } else {
-                if (song.flags.video) {
-                    activePlayer = video;
-                    video.src = `/api/music/stream/${song.id}/4.mp4`;
-                    playerWrapper.classList.add("video-mode");
-                } else {
-                    activePlayer = audio;
-                    audio.src = `/api/music/stream/${song.id}/2.mp3`;
-                    playerWrapper.classList.remove("video-mode");
-                }
-                modeIcon.className = "fa-solid fa-microphone text-md mb-1 text-green-400";
-                modeText.innerText = "Vocal";
-            }
-
-            activePlayer.currentTime = currentTime; 
-            if(isPlaying) activePlayer.play();
-        }
-
-        function togglePlay() {
-            if (activePlayer.paused) {
-                activePlayer.play();
-                isPlaying = true;
-                playIcon.className = "fa-solid fa-pause";
-                playerWrapper.classList.add("playing");
-            } else {
-                activePlayer.pause();
-                isPlaying = false;
-                playIcon.className = "fa-solid fa-play ml-1";
-                playerWrapper.classList.remove("playing");
-            }
-        }
-
-        function prevSong() { loadSong((currentIndex - 1 + rawPlaylist.length) % rawPlaylist.length, true); }
-        function nextSong() { loadSong((currentIndex + 1) % rawPlaylist.length, true); }
-        
-        let isDragging = false;
-        progressBar.addEventListener('mousedown', () => isDragging = true);
-        progressBar.addEventListener('touchstart', () => isDragging = true);
-        progressBar.addEventListener('mouseup', () => { isDragging = false; seekMedia(); });
-        progressBar.addEventListener('touchend', () => { isDragging = false; seekMedia(); });
-
-        function seekMedia() { activePlayer.currentTime = (progressBar.value / 100) * activePlayer.duration; }
-
-        function updateProgress() {
-            if(activePlayer.duration && !isDragging) {
-                progressBar.value = (activePlayer.currentTime / activePlayer.duration) * 100;
-                document.getElementById("currentTime").innerText = formatTime(activePlayer.currentTime);
-                document.getElementById("totalTime").innerText = formatTime(activePlayer.duration);
-            }
-            
-            if(lyrics.length > 0) {
-                const currentMs = activePlayer.currentTime * 1000;
-                let activeIndex = -1;
-                for(let i=0; i<lyrics.length; i++) {
-                    if(currentMs >= lyrics[i].time) activeIndex = i; else break;
-                }
-                
-                if(activeIndex !== -1) {
-                    document.querySelectorAll('.lyric-line').forEach(el => el.classList.remove('lyric-active'));
-                    const activeEl = document.getElementById("lrc-" + activeIndex);
-                    if(activeEl) {
-                        activeEl.classList.add('lyric-active');
-                        document.getElementById("lyricWrapper").style.transform = `translateY(-${activeEl.offsetTop - 30}px)`;
-                    }
-                }
-            }
-        }
-
-        function formatTime(sec) {
-            if(isNaN(sec)) return "0:00";
-            let m = Math.floor(sec / 60); let s = Math.floor(sec % 60);
-            return `${m}:${s < 10 ? '0'+s : s}`;
-        }
-
-        let sleepTimer = null; let timerMinutes = 0;
-        function toggleSleepTimer() {
-            timerMinutes = timerMinutes === 0 ? 15 : timerMinutes === 15 ? 30 : timerMinutes === 30 ? 60 : 0;
-            const icon = document.getElementById("timerIcon"), text = document.getElementById("timerText");
-            if(sleepTimer) clearTimeout(sleepTimer);
-
-            if(timerMinutes === 0) {
-                icon.className = "fa-solid fa-moon text-sm"; icon.style.color = ""; text.classList.add("hidden");
-            } else {
-                icon.className = "fa-solid fa-clock text-sm"; icon.style.color = "#e94560";
-                text.classList.remove("hidden"); text.innerText = timerMinutes + "m";
-                sleepTimer = setTimeout(() => { if(isPlaying) togglePlay(); timerMinutes = 0; toggleSleepTimer(); }, timerMinutes * 60000);
-            }
-        }
-
-        initApp();
-    </script>
+<script src="src/app.js"></script>
 </body>
 </html>
